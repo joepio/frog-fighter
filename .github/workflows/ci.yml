@@ -1,0 +1,64 @@
+name: Frog Fighter
+on:
+  pull_request:
+    paths-ignore: ['**/*.md']
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  game-and-integration:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Godot
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'godot.zip'
+          Invoke-WebRequest 'https://github.com/godotengine/godot-builds/releases/download/4.5.2-stable/Godot_v4.5.2-stable_win64.exe.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne '3766090865330AB2A0ED33594520394B711C620B1378F9223904FAEEF60F2F14') { throw 'Godot checksum mismatch' }
+          Expand-Archive $archive "$env:RUNNER_TEMP/godot"
+      - name: Import and exercise game
+        shell: pwsh
+        run: |
+          $godot = "$env:RUNNER_TEMP/godot/Godot_v4.5.2-stable_win64_console.exe"
+          & $godot --headless --path . --editor --import --quit
+          if ($LASTEXITCODE -ne 0) { throw 'Import failed' }
+          & $godot --headless --path . --script res://tests/run.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Simulation failed' }
+          & $godot --headless --path . --script res://tests/combat.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Combat feedback failed' }
+          & $godot --headless --path . --script res://tests/forest.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Forest weapons and gore failed' }
+          & $godot --headless --path . --script res://tests/menu.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Menu and match lifecycle failed' }
+          & $godot --headless --path . --script res://tests/movement.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Movement and bot combat failed' }
+          & $godot --headless --path . --script res://tests/arsenal.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Wall movement and new weapons failed' }
+          & $godot --headless --path . --script res://tests/pickup.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Auto pickup, throwing and AI failed' }
+          & $godot --headless --path . --script res://tests/survival.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Survival enemies and bosses failed' }
+          & $godot --headless --path . --script res://tests/arenas.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Arena movement and spawns failed' }
+          & $godot --headless --path . --script res://tests/terrain.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Rock landing and safe water failed' }
+          & $godot --headless --path . --script res://tests/expansion.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Expanded arenas, hazards and collapse failed' }
+          & $godot --headless --path . --script res://tests/physics.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Physical ropes, stacks and impacts failed' }
+          & $godot --headless --path . --script res://tests/tongue_physics.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Tongue momentum and pendulum stability failed' }
+          & $godot --headless --path . --script res://tests/burr.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Impact hand grenade and blast effects failed' }
+          & $godot --headless --path . --script res://tests/destruction.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Destructible terrain and support cascades failed' }
+          python tests/integration.py --godot $godot
+          if ($LASTEXITCODE -ne 0) { throw 'Host lifecycle failed' }

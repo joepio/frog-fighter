@@ -1,0 +1,48 @@
+name: Windows release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Godot
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'godot.zip'
+          Invoke-WebRequest 'https://github.com/godotengine/godot-builds/releases/download/4.5.2-stable/Godot_v4.5.2-stable_win64.exe.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne '3766090865330AB2A0ED33594520394B711C620B1378F9223904FAEEF60F2F14') { throw 'Godot checksum mismatch' }
+          Expand-Archive $archive "$env:RUNNER_TEMP/godot"
+      - name: Package and verify host integration
+        shell: pwsh
+        run: |
+          python tools/package.py --godot "$env:RUNNER_TEMP/godot/Godot_v4.5.2-stable_win64.exe" --output dist
+          if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
+          python tests/integration.py --godot "$PWD/dist/FrogFighter.exe" --packed
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged integration failed' }
+          $hash = (Get-FileHash dist/frog-fighter-windows.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  frog-fighter-windows.zip" | Set-Content -Encoding ascii dist/frog-fighter-windows.zip.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frog-fighter-windows
+          path: |
+            dist/frog-fighter-windows.zip
+            dist/frog-fighter-windows.zip.sha256
+      - name: Publish immutable release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release view $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) { throw 'Release already exists; publish a new version instead of replacing catalog-pinned bytes' }
+          gh release create $env:GITHUB_REF_NAME dist/frog-fighter-windows.zip dist/frog-fighter-windows.zip.sha256 --verify-tag --title "Frog Fighter $env:GITHUB_REF_NAME" --generate-notes
+          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }

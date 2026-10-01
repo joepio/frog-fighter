@@ -1,0 +1,30 @@
+{
+  "id": "frog-fighter",
+  "title": "Frog Fighter",
+  "tagline": "Grapple, blast and smash a terrarium with up to four frogs. Exaggerated cartoon gore.",
+  "developer": "Joep Meindertsma",
+  "players": {
+    "min": 1,
+    "max": 4,
+    "best": 4
+  },
+  "match_minutes": 5,
+  "price": "free",
+  "integration": {
+    "level": "integrated",
+    "protocol": 1
+  },
+  "tags": [
+    "versus",
+    "co-op",
+    "party",
+    "physics",
+    "platformer",
+    "cartoon-gore"
+  ],
+  "links": {
+    "source": "https://github.com/joepio/frog-fighter",
+    "homepage": "https://github.com/joepio/frog-fighter",
+    "download": "https://github.com/joepio/frog-fighter/releases"
+  }
+}
