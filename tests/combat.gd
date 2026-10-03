@@ -47,7 +47,8 @@ func run()->void:
 	check(s.over,"Last knockout ends versus")
 	var debris:Vector2=s.gore[0].pos;time=s.clock
 	for i in range(10):s.step(1.0/120,[])
-	check(s.clock==time and s.gore[0].pos!=debris,"Debris continues while finished gameplay remains frozen")
+	check(s.clock>time and s.gore[0].pos!=debris,"Debris and winner simulation continue during the victory lap")
+	check(s.over and not victim.alive and victim.lives==0,"The victory lap preserves the result and defeated player")
 	s=game();s.frogs[1].pos=Vector2(0,9);s.crates=[{"pos":Vector2(1,9),"vel":Vector2.ZERO,"angle":0.0}]
 	s.shots=[{"pos":Vector2(-1,9),"vel":Vector2(300,0),"owner":0,"kind":"seed","volley":1,"life":1.0}]
 	s.update_shots(.01)
