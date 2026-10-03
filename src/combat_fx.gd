@@ -73,7 +73,7 @@ func build(world:Node3D)->void:
 func update(sim:RefCounted)->void:
 	impact_blast.update(sim)
 	var dt:float=maxf(0,sim.fx_clock-previous_time);previous_time=sim.fx_clock
-	for i in range(jets.size()):
+	for i in range(sim.frogs.size()):
 		var j:Dictionary=jets[i];var p:Dictionary=sim.frogs[i]
 		var active:bool=p.alive and p.respawn<=0 and p.last_weapon=="flame" and p.shot_age<.10
 		if active:

@@ -70,10 +70,8 @@ func _draw()->void:
 		centered(str(ceili(s.countdown)),Vector2(800,450),90,CREAM,serif)
 		centered(s.Arenas.NAMES[s.arena_id],Vector2(800,493),23,CREAM,bold)
 		centered(s.Arenas.DESCRIPTIONS[s.arena_id],Vector2(800,523),16,MUTED)
-	if s.over:
-		panel(Rect2(530,335,540,190),Color(.045,.09,.065,.94),22)
-		centered(s.winner,Vector2(800,413),40,CREAM,serif)
-		centered("Next round in %d"%maxi(1,ceili(6-game.results_time)),Vector2(800,473),17,MUTED)
+	if game.celebrating:
+		centered(game.last_result,Vector2(800,166),36,CREAM,bold)
 
 func row_enabled(row:int)->bool:
 	return row!=2 or (game.selected_mode=="versus" and game.human_count<4)

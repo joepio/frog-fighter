@@ -46,9 +46,10 @@ func run()->void:
 		if item.get_meta("menu_key","")=="restart":item.pressed.emit();break
 	check(not game.in_menu and not game.paused_local and game.sim.frogs.size()==3 and game.sim.frogs[0].lives==1,"New match applies settings directly from the pause menu")
 	check(game.find_children("*","AudioStreamPlayer",true,false).is_empty(),"No sound effect players are created")
-	game.sim.over=true;game.results_time=5.99
+	game.sim.over=true;game.sim.winner="Ripple"
 	for i in range(3):await physics_frame
-	check(not game.sim.over and game.sim.countdown>0,"Results transition to a fresh round")
+	check(game.sim.over and game.celebrating,"Result holds the current arena for the victory lap")
+	check(game.last_result=="Ripple" and game.result_banner_time>0,"Survival result appears during the transition")
 	game.show_menu();game.select_mode("versus");game.set_players(1);game.set_bots(3);game.start_local()
 	check(game.sim.frogs.size()==4 and game.sim.frogs[1].bot,"Standalone versus fills spare seats with bots")
 	game.show_menu();game.set_players(2);game.set_bots(1);game.set_lives(5)
@@ -108,6 +109,8 @@ func run()->void:
 	if previous.is_empty():DirAccess.remove_absolute(ProjectSettings.globalize_path(config_path))
 	else:
 		var f:=FileAccess.open(config_path,FileAccess.WRITE);f.store_string(previous);f.close()
+	game.set_process(false);game.set_physics_process(false);game.discard_prepared()
+	while game.preparing:await process_frame
 	game.queue_free();await process_frame
 	print("Frog Fighter menu/lifecycle: %d checks, %d failures"%[checks,failures])
 	quit(1 if failures else 0)

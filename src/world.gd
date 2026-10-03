@@ -11,6 +11,7 @@ const EnemyVisuals=preload("res://src/enemy_visuals.gd")
 const Landmarks=preload("res://src/landmarks.gd")
 var combat:Node3D
 var sim:RefCounted
+var stage:Node3D
 var camera:Camera3D
 var frogs:Array=[]
 var shelves:Array=[]
@@ -73,6 +74,44 @@ func tube(parent:Node3D,a:Vector3,b:Vector3,radius:float,color:Color)->MeshInsta
 
 func build(state:RefCounted)->void:
 	sim=state
+	build_stage()
+	build_actors()
+	update()
+
+func can_reuse(state:RefCounted)->bool:
+	if state.frogs.size()>frogs.size():return false
+	for i in range(state.frogs.size()):
+		if Color(state.frogs[i].color)!=frogs[i].color:return false
+	return true
+
+func reset(state:RefCounted,prepared:Node3D=null)->void:
+	var same_stage:bool=state.arena_id==sim.arena_id and state.platforms.size()==shelves.size() and state.crates.size()==boxes.size()
+	sim=state
+	for rope in rope_nodes:rope.free()
+	rope_nodes.clear()
+	if not same_stage:
+		remove_child(stage);stage.queue_free()
+		shelves.clear();boxes.clear();water=null;landmarks=null
+		if prepared!=null:
+			stage=prepared.stage;stage.reparent(self)
+			camera=prepared.camera;camera.make_current()
+			shelves=prepared.shelves;boxes=prepared.boxes;water=prepared.water;landmarks=prepared.landmarks
+			landmarks.host=self
+			for child in stage.get_children():
+				if child.get_script()==Backdrop:child.host=self
+		else:build_stage()
+	for i in range(sim.frogs.size(),frogs.size()):
+		frogs[i].root.hide();contact_shadows[i].hide();swim_rings[i].hide()
+	combat.previous_time=0.0
+	for jet in combat.jets:
+		jet.age=0.0;jet.strength=0.0;jet.length=0.0;jet.node.visible=false
+	for visual in enemy_visuals.visuals.values():visual.root.free()
+	enemy_visuals.visuals.clear()
+	update()
+
+func build_stage(incremental:bool=false)->void:
+	# Arena scenery is separate from the expensive reusable actors and FX pools.
+	var existing:Array=get_children()
 	var env:=WorldEnvironment.new();env.environment=Environment.new()
 	env.environment.background_mode=Environment.BG_COLOR
 	env.environment.background_color=Color("35463b")
@@ -90,8 +129,12 @@ func build(state:RefCounted)->void:
 	camera.size=maxf(sim.ceiling+3.6,(sim.half_width*2+5)*9.0/16);camera.position=Vector3(0,sim.ceiling*.5+7.3,37)
 	add_child(camera);camera.look_at(Vector3(0,sim.ceiling*.5-.3,0));camera.current=true
 	var backdrop:=Backdrop.new();add_child(backdrop);backdrop.build(self)
+	if incremental:await get_tree().process_frame
 	landmarks=Landmarks.new();add_child(landmarks);landmarks.build(self,sim.theme=="garden")
-	if sim.theme!="garden":ArenaScenery.build(self)
+	if incremental:await get_tree().process_frame
+	if sim.theme!="garden":
+		if incremental:await ArenaScenery.build(self,true)
+		else:ArenaScenery.build(self)
 	else:
 		# The distant garden is soft; the physical rim and playfield stay sharp.
 		mesh(self,Scenery.rounded_box(Vector3(30.5,.4,10),.14),Vector3(0,.05,1.3),Vector3.ONE,material(Color("615344"),true))
@@ -102,6 +145,7 @@ func build(state:RefCounted)->void:
 		# Handmade hanging branch across the roof.
 		landmarks.branch(Vector3(-14.6,15.9,-.4),Vector3(14.0,15.8,-.4),.26)
 		for s in sim.platforms:
+			if incremental:await get_tree().process_frame
 			var shelf:=Node3D.new();add_child(shelf)
 			if s.kind in ["fungus","rock","water"]:
 				shelves.append(shelf)
@@ -127,6 +171,7 @@ func build(state:RefCounted)->void:
 			ball(self,Vector3(0,4.35,1.08),Vector3(.11,.11,.045),Color("72543c"))
 		for hook in sim.hooks:vine_grip(hook)
 		for side in [-1,1]:
+			if incremental:await get_tree().process_frame
 			pot(Vector3(side*11.8,1.3,1.1),1.1) if sim.arena_id=="terrarium" else pot(Vector3(side*12.6,1.1,.5),.75)
 			plant(Vector3(side*10,15.9,-.4),1.0,-side)
 			for j in range(4):
@@ -142,9 +187,23 @@ func build(state:RefCounted)->void:
 			Scenery.lily(self,Vector3(x,.43,2.1+sin(i)*.65),.75,Color("708649") if i%2==0 else Color("8b9e53"))
 			if i%3==0:flower(Vector3(x,.50,2.1+sin(i)*.65))
 
-	Scenery.batch_static(self,[water])
+	if incremental:await get_tree().process_frame
+	Scenery.batch_static(self,[water]+existing)
 	Scenery.batch_static(landmarks)
-	for shelf in shelves:Scenery.batch_static(shelf)
+	for shelf in shelves:
+		if incremental:await get_tree().process_frame
+		Scenery.batch_static(shelf)
+	for box in sim.crates:
+		var n:=Node3D.new();add_child(n)
+		mesh(n,Scenery.rounded_box(Vector3(1.1,1.1,1.1),.055),Vector3.ZERO,Vector3.ONE,material(Color("e7d5b6"),true))
+		var brace:=block(n,Vector3(0,0,.565),Vector3(.14,1.25,.07),Color("ede1cc"),true);brace.rotation.z=-.7
+		for y in [-.46,.46]:block(n,Vector3(0,y,.57),Vector3(1,.1,.08),Color("d7c4a5"),true)
+		boxes.append(n)
+	stage=Node3D.new();stage.name="ArenaStage";add_child(stage)
+	for child in get_children():
+		if child!=stage and child not in existing:child.reparent(stage)
+
+func build_actors()->void:
 	for p in sim.frogs:
 		frogs.append(make_frog(Color(p.color)))
 		var shadow_mat:=StandardMaterial3D.new();shadow_mat.albedo_color=Color(.08,.10,.06,.3);shadow_mat.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -154,12 +213,6 @@ func build(state:RefCounted)->void:
 		var ripple_shape:=TorusMesh.new();ripple_shape.inner_radius=.43;ripple_shape.outer_radius=.45;ripple_shape.rings=32;ripple_shape.ring_segments=4
 		var ripple_mat:=StandardMaterial3D.new();ripple_mat.albedo_color=Color(.66,.85,.74,.6);ripple_mat.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
 		var ripple:=mesh(self,ripple_shape,Vector3.ZERO,Vector3.ONE,ripple_mat);ripple.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;swim_rings.append(ripple)
-	for box in sim.crates:
-		var n:=Node3D.new();add_child(n)
-		mesh(n,Scenery.rounded_box(Vector3(1.1,1.1,1.1),.055),Vector3.ZERO,Vector3.ONE,material(Color("e7d5b6"),true))
-		var brace:=block(n,Vector3(0,0,.565),Vector3(.14,1.25,.07),Color("ede1cc"),true);brace.rotation.z=-.7
-		for y in [-.46,.46]:block(n,Vector3(0,y,.57),Vector3(1,.1,.08),Color("d7c4a5"),true)
-		boxes.append(n)
 	enemy_visuals=EnemyVisuals.new();add_child(enemy_visuals);enemy_visuals.build(self)
 	effects=Node3D.new();add_child(effects)
 
@@ -177,7 +230,6 @@ func build(state:RefCounted)->void:
 		organ.material_override.roughness=.48;organ.material_override.metallic_specular=.4
 		organ_meshes.append(organ)
 	particle_mesh=make_droplets(180,Color.WHITE,true)
-	update()
 
 func vine_grip(hook:Vector2)->void:
 	var tip:=Vector3(hook.x,hook.y,.05)
@@ -339,7 +391,7 @@ func update()->void:
 			for side in [-1,1]:
 				var bottom:Vector2=s.pos+Vector2(side*s.width*.38,0).rotated(s.angle)
 				rope_nodes.append(tube(self,Vector3(s.base.x+side*s.width*.38,sim.ceiling-.2,-.45),Vector3(bottom.x,bottom.y,-.45),.043,Color("b3a17c")))
-	for i in range(frogs.size()):
+	for i in range(sim.frogs.size()):
 		var p:Dictionary=sim.frogs[i];var f:Dictionary=frogs[i]
 		f.root.visible=p.alive and p.respawn<=0
 		f.root.position=Vector3(p.pos.x,p.pos.y,.35)

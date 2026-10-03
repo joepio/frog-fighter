@@ -20,7 +20,16 @@ var selected_arena:="terrarium"
 var arena_round:=0
 var best_wave:=0
 var next_round:=1
-var results_time:=0.0
+var result_banner_time:=0.0
+var last_result:=""
+var victory_time:=0.0
+var celebrating:=false
+var pending_sim:RefCounted
+var pending_world:Node3D
+var pending_view:SubViewport
+var pending_key:=""
+var preparing:=false
+var preparation_generation:=0
 var back_release:=0.0
 var activity_timer:=0.0
 var capture_path:=""
@@ -141,28 +150,77 @@ func start_local()->void:
 	in_menu=false;paused_local=false;running=true;arena_round=0;roster=local_roster(demo)
 	hud.hide_menu();new_round();save_settings();back_release=0
 
-func new_round()->void:
-	if is_instance_valid(world):remove_child(world);world.queue_free()
-	var arena:String=Simulation.Arenas.IDS[arena_round%Simulation.Arenas.IDS.size()] if selected_arena=="cycle" else selected_arena
-	sim=Simulation.new(roster,selected_mode,next_round,arena);next_round+=1
+func round_arena()->String:
+	return Simulation.Arenas.IDS[arena_round%Simulation.Arenas.IDS.size()] if selected_arena=="cycle" else selected_arena
+
+func round_key(players:Array)->String:
+	return JSON.stringify([round_arena(),selected_mode,next_round,round_lives,players])
+
+func discard_prepared()->void:
+	preparation_generation+=1
+	if is_instance_valid(pending_view):pending_view.queue_free()
+	pending_view=null;pending_world=null;pending_sim=null;pending_key=""
+
+func prepare_next_round()->void:
+	if preparing or not is_instance_valid(world):return
+	var players:Array=local_roster(demo) if in_menu and not paused_local else roster
+	var key_value:String=round_key(players)
+	if key_value==pending_key:return
+	discard_prepared()
+	pending_key=key_value
+	pending_sim=Simulation.new(players,selected_mode,next_round,round_arena())
+	# Same-arena restarts only need fresh simulation data, not new scenery.
+	if world.sim.arena_id==pending_sim.arena_id:return
+	preparing=true
+	var generation:int=preparation_generation
+	var viewport:=SubViewport.new();viewport.own_world_3d=true
+	viewport.size=get_viewport().get_visible_rect().size
+	viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED
+	add_child(viewport)
+	var preview:=World.new();viewport.add_child(preview);preview.sim=pending_sim
+	await preview.build_stage(true)
+	preparing=false
+	if generation!=preparation_generation:
+		viewport.queue_free();return
+	pending_view=viewport;pending_world=preview
+
+func new_round(quick:bool=false)->void:
+	var previous_aim:Dictionary={}
+	if quick and sim!=null:
+		for p in sim.frogs:previous_aim[p.slot]=p.aim
+	var prepared:bool=pending_key==round_key(roster) and pending_sim!=null and not preparing
+	sim=pending_sim if prepared else Simulation.new(roster,selected_mode,next_round,round_arena())
+	next_round+=1
 	if not in_menu:arena_round+=1
 	if not bridge.launched_by_daemon:
 		for p in sim.frogs:p.lives=round_lives;p["starting_lives"]=round_lives
-	world=World.new();add_child(world);world.build(sim);results_time=0
+	sim.countdown=.8
+	if quick:
+		for p in sim.frogs:
+			if previous_aim.has(p.slot):p.aim=previous_aim[p.slot]
+	result_banner_time=0;celebrating=false;victory_time=0
+	if is_instance_valid(world) and world.can_reuse(sim):
+		world.reset(sim,pending_world if prepared else null)
+	else:
+		if is_instance_valid(world):remove_child(world);world.queue_free()
+		world=World.new();add_child(world);world.build(sim)
+	discard_prepared()
 
 func _physics_process(dt:float)->void:
 	if sim==null or paused_local or (not running and not in_menu):return
-	if sim.over:
-		sim.step(dt,[])
-		results_time+=dt
-		if results_time>=6:new_round()
-		return
+	if sim.over and not celebrating:
+		celebrating=true;victory_time=0
+		last_result=sim.winner+(" wins" if sim.mode=="versus" and sim.winner!="Draw" else "")
+		result_banner_time=2.0
+		if sim.mode=="survival":best_wave=maxi(best_wave,sim.wave);save_settings()
+		if bridge.launched_by_daemon:bridge.notify_finished(bridge.session)
+	if celebrating:
+		victory_time+=dt
+		# Keep the winner playable if scenery preparation needs another frame.
+		if victory_time>=2.0 and not preparing:new_round(true)
 	var inputs:Array=[]
 	for p in sim.frogs:inputs.append({} if in_menu else (sim.bot(p) if p.bot else controls(p)))
 	sim.step(dt,inputs)
-	if sim.over:
-		if sim.mode=="survival":best_wave=maxi(best_wave,sim.wave);save_settings()
-		if bridge.launched_by_daemon:bridge.notify_finished(bridge.session)
 
 func controls(p:Dictionary)->Dictionary:
 	if bridge.launched_by_daemon:
@@ -206,6 +264,7 @@ func key(code:int)->bool:return Input.is_physical_key_pressed(code)
 func deadzone(value:float)->float:return signf(value)*maxf(0,(absf(value)-.17)/.83)
 
 func _process(dt:float)->void:
+	if not paused_local and (running or in_menu):prepare_next_round()
 	process_back(dt)
 	if sim!=null and (running or in_menu) and not paused_local:world.update()
 	hud.queue_redraw()
@@ -295,8 +354,10 @@ func pause_managed(_session:String)->void:
 	running=false;quiet_window()
 
 func dispose_managed(_session:String)->void:
+	discard_prepared();celebrating=false;victory_time=0
 	running=false;quiet_window();roster=[];sim=null
 	if is_instance_valid(world):remove_child(world);world.queue_free()
+	world=null
 
 func quiet_window()->void:
 	AudioServer.set_bus_mute(0,true)

@@ -165,8 +165,12 @@ when released. Controllers provide independent aiming for every player.
 - **Bots:** seek and automatically collect weapons, route between platforms,
   grapple to higher shelves, lead moving targets, respect weapon range, and
   avoid shooting directly into scenery. New weapons replenish on reachable shelves.
-- Rounds restart after a six-second results screen. Each new round varies the
-  Terrarium upper platform placement and moving platform phases. Settings and the survival record persist
+- Winners get a two-second victory lap with movement, jumping, aiming, and a
+  win banner while the next arena is prepared incrementally. The first map and
+  following rounds use a short 0.8-second ready countdown. Right-stick aiming stays responsive during countdowns, respawns,
+  and hit pauses. Arena scenery and combat visuals are reused between rounds and when starting
+  from the menu to reduce transition time. Each new round varies the Terrarium upper platform
+  placement and moving platform phases. Settings and the survival record persist
   in Godot's `user://pond.cfg` (Windows: `%APPDATA%/Godot/app_userdata/Frog Fighter`).
 
 The garden uses a 1280×720 background render with a dense Gaussian blur instead

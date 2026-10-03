@@ -60,5 +60,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Impact hand grenade and blast effects failed' }
           & $godot --headless --path . --script res://tests/destruction.gd
           if ($LASTEXITCODE -ne 0) { throw 'Destructible terrain and support cascades failed' }
+          & $godot --headless --path . --script res://tests/transitions.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Responsive countdowns and reusable level transitions failed' }
           python tests/integration.py --godot $godot
           if ($LASTEXITCODE -ne 0) { throw 'Host lifecycle failed' }

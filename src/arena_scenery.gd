@@ -1,6 +1,6 @@
 extends RefCounted
 # New arenas use the existing textured 3D asset kit, with distinct silhouettes.
-static func build(host:Node3D)->void:
+static func build(host:Node3D,incremental:bool=false)->void:
 	var sim:RefCounted=host.sim
 	if sim.theme=="mushrooms":host.landmarks.stone.albedo_color=Color("b0b3c6")
 	var stone:Color=Color("87998e") if sim.theme=="ruins" else Color("716c86")
@@ -13,6 +13,7 @@ static func build(host:Node3D)->void:
 			var x:float=-sim.half_width+1+i*2
 			host.Scenery.lily(host,Vector3(x,.43,2.0+sin(i)*.6),.9,Color("758e55"))
 	for shelf in sim.platforms:
+		if incremental:await host.get_tree().process_frame
 		var root:=Node3D.new();host.add_child(root);host.shelves.append(root)
 		if shelf.kind in ["water","fungus"]:continue
 		if shelf.get("max_hp",0)>0:
@@ -48,6 +49,7 @@ static func build(host:Node3D)->void:
 			for i in range(int(sim.half_width)+1):host.landmarks.rock(Vector3(-sim.half_width+i*2,sim.ceiling+.8,-.25),Vector3(1.3,1.0,1.0))
 		else:host.landmarks.branch(Vector3(-sim.half_width,sim.ceiling-.2,-.4),Vector3(sim.half_width,sim.ceiling-.2,-.4),.25)
 	for side in [-1,1]:
+		if incremental:await host.get_tree().process_frame
 		if sim.walls:
 			if sim.theme=="mushrooms":
 				for i in range(int(sim.ceiling/2)+1):host.landmarks.rock(Vector3(side*(sim.half_width+1.1),i*2,-.2),Vector3(1.25,1.3,1.3))

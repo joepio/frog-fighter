@@ -198,18 +198,27 @@ func update_crumble(shelf:Dictionary,dt:float)->void:
 func add_pickup(p:Vector2,kind:String)->void:
 	pickups.append({"pos":p,"vel":Vector2.ZERO,"kind":kind,"age":0.0})
 
+func aim_frog(p:Dictionary,c:Dictionary)->void:
+	var aim:Vector2=c.get("aim",Vector2.ZERO)
+	if aim.length()>.18:p.aim=aim.normalized()
+	if absf(p.aim.x)>.1:p.facing=signf(p.aim.x)
+	p.trigger_held=c.get("fire",false)
+
+func update_aim(inputs:Array)->void:
+	# Aim is presentation input: it stays responsive while combat/physics wait.
+	for i in range(mini(frogs.size(),inputs.size())):aim_frog(frogs[i],inputs[i])
+
 func step(dt:float,inputs:Array)->void:
+	update_aim(inputs)
 	events.clear()
 	update_feedback(dt)
+	if over:hitstop=0.0
 	if hitstop>0:
 		while buffered_inputs.size()<frogs.size():buffered_inputs.append({})
 		for i in range(mini(inputs.size(),frogs.size())):
 			for action in ["jump","throw"]:
 				buffered_inputs[i][action]=buffered_inputs[i].get(action,false) or inputs[i].get(action,false)
 		hitstop=maxf(0,hitstop-dt)
-		return
-	if over:
-		update_debris(dt)
 		return
 	if countdown>0:
 		countdown=maxf(0,countdown-dt)
@@ -284,14 +293,16 @@ func step(dt:float,inputs:Array)->void:
 			var shelf:Dictionary=platforms[rng.randi_range(0,mini(arena_platform_count-1,platforms.size()-1))]
 			if usable(shelf):add_pickup(shelf.pos+Vector2(rng.randf_range(-.3,.3)*shelf.width,1),WEAPON_ORDER[rng.randi_range(0,WEAPON_ORDER.size()-1)])
 	update_shots(dt)
-	if mode=="survival": update_survival(dt)
+	if mode=="survival" and not over: update_survival(dt)
 	update_debris(dt)
+	if over:return # The declared result stays final while the winner plays.
 	var living:Array=frogs.filter(func(p):return p.alive)
 	if mode=="versus" and frogs.size()>1 and living.size()<=1:
 		over=true;winner=living[0].name if living.size()==1 else "Draw"
 	elif mode=="survival" and living.is_empty(): over=true;winner="Wave %d reached"%wave
 
 func update_frog(p:Dictionary,c:Dictionary,dt:float)->void:
+	aim_frog(p,c)
 	if not p.alive: return
 	if p.respawn>0:
 		p.respawn-=dt
@@ -307,9 +318,6 @@ func update_frog(p:Dictionary,c:Dictionary,dt:float)->void:
 	if p.ground>=0 and not usable(platforms[p.ground]):p.ground=-1
 	if not p.anchor.is_empty() and p.anchor.platform>=0 and not usable(platforms[p.anchor.platform]):p.anchor={}
 	var move:Vector2=c.get("move",Vector2.ZERO)
-	var aim:Vector2=c.get("aim",Vector2.ZERO)
-	if aim.length()>.18: p.aim=aim.normalized()
-	if absf(p.aim.x)>.1: p.facing=signf(p.aim.x)
 	var jump:bool=c.get("jump",false)
 	var tongue:bool=c.get("tongue",false)
 	p.tongue_active=tongue;p.trigger_held=c.get("fire",false)
@@ -814,6 +822,7 @@ func update_shots(dt:float)->void:
 	enemies=enemies.filter(func(e):return e.hp>0)
 
 func hurt(p:Dictionary,damage:float,impulse:Vector2,kind:String="contact",volley:int=-1,contact:Vector2=Vector2.INF)->void:
+	if over:return
 	var continuation:bool=volley>0 and p.last_volley==volley
 	var gentle:bool=kind=="flame"
 	if not p.alive or p.respawn>0 or (p.invincible>0 and not continuation):return
@@ -839,6 +848,9 @@ func hurt(p:Dictionary,damage:float,impulse:Vector2,kind:String="contact",volley
 	if p.hp<=0:knockout(p)
 
 func knockout(p:Dictionary)->void:
+	if over:
+		p.pos=p.spawn;p.vel=Vector2.ZERO;p.anchor={};p.ground=-1;p.stuck=false
+		return
 	if not p.alive or p.respawn>0:return
 	var pos:Vector2=Vector2(p.pos.x,maxf(.65,p.pos.y)) if safe_water else p.pos
 	blood(pos,p.vel*.5+Vector2(0,8),24,Color(p.color),true)
