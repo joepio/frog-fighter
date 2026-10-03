@@ -1,4 +1,10 @@
 extends RefCounted
+var run_speed := 1.0
+var jump_height := 1.0
+var gravity := 1.0
+var damage := 1.0
+var pickup_seconds := 4.0
+var bot_reaction := 1.0
 const Destruction=preload("res://src/destruction.gd")
 const Physics=preload("res://src/arena_physics.gd")
 const Terrain=preload("res://src/terrain.gd")
@@ -154,7 +160,7 @@ func _init(roster: Array = [], game_mode: String = "versus", seed_value: int = 1
 				if absf(position.x-shelf.base.x)<shelf.width*.5 and position.y>shelf.base.y and position.y-shelf.base.y<1.5:
 					position+=shelf.pos-shelf.base;break
 			add_pickup(position,["rail","grenade"][i])
-	pickup_timer=4
+	pickup_timer=pickup_seconds
 
 func platform(p:Vector2,width:float,kind:String)->Dictionary:
 	return {"pos":p,"base":p,"width":width,"angle":0.0,"omega":0.0,"kind":kind,"phase":0.0,"vel":Vector2.ZERO,"active":true,"stress":0.0,"falling":false,"restore":0.0}
@@ -276,7 +282,7 @@ func step(dt:float,inputs:Array)->void:
 	pickups=pickups.filter(func(item):return not item.get("lost",false))
 	pickup_timer-=dt
 	if pickup_timer<=0 and pickups.size()<supply_count and not platforms.is_empty():
-		pickup_timer=4
+		pickup_timer=pickup_seconds
 		if not supply_sites.is_empty():
 			var site:Array=supply_sites[rng.randi_range(0,supply_sites.size()-1)]
 			if not pickups.any(func(item):return item.get("site",-1)==supply_sites.find(site)):place_supply(site)
@@ -341,16 +347,16 @@ func update_frog(p:Dictionary,c:Dictionary,dt:float)->void:
 	elif not p.anchor.is_empty():
 		p.vel.x+=move.x*26*dt
 	else:
-		p.vel.x=move_toward(p.vel.x,move.x*RUN_SPEED,(60 if p.ground>=0 else (55 if p.wall_air>0 else AIR_ACCELERATION))*dt)
+		p.vel.x=move_toward(p.vel.x,move.x*RUN_SPEED*run_speed,(60 if p.ground>=0 else (55 if p.wall_air>0 else AIR_ACCELERATION))*dt)
 	if p.jump_buffer>0 and (p.coyote>0 or p.stuck or was_stuck or not p.anchor.is_empty()):
 		var launch:=Vector2.ZERO
 		if p.ground>=0 and Physics.dynamic(platforms[p.ground]):
 			var support:Dictionary=platforms[p.ground]
 			launch=Physics.velocity(support,p.pos)*.65
 			Physics.impulse(support,Vector2(0,-5),p.pos)
-		p.vel.y=JUMP_SPEED;p.vel+=launch
+		p.vel.y=JUMP_SPEED*jump_height;p.vel+=launch
 		if p.stuck or was_stuck:
-			p.vel=grip_normal*(5.5 if absf(grip_normal.x)>.8 else 9)+Vector2(0,JUMP_SPEED if absf(grip_normal.x)>.8 else 5)
+			p.vel=grip_normal*(5.5 if absf(grip_normal.x)>.8 else 9)+Vector2(0,JUMP_SPEED*jump_height if absf(grip_normal.x)>.8 else 5)
 			p.pos+=grip_normal*.2
 			p.wall_release=.10;p.wall_air=.40
 		p.stuck=false;p.ground=-1;p.coyote=0.0;p.jump_buffer=0.0;p.anchor={}
@@ -361,7 +367,7 @@ func update_frog(p:Dictionary,c:Dictionary,dt:float)->void:
 		if not p.anchor.is_empty():
 			p.rope=p.pos.distance_to(anchor_point(p.anchor));events.append("tongue")
 	if not tongue: p.anchor={}
-	if not p.stuck:p.vel.y-=(25.0 if not p.anchor.is_empty() else (RISE_GRAVITY if p.vel.y>0 else FALL_GRAVITY))*dt
+	if not p.stuck:p.vel.y-=(25.0 if not p.anchor.is_empty() else (RISE_GRAVITY if p.vel.y>0 else FALL_GRAVITY))*gravity*dt
 	p.vel=p.vel.limit_length(30)
 	p.pos+=p.vel*dt
 	if not p.anchor.is_empty():
@@ -818,7 +824,7 @@ func hurt(p:Dictionary,damage:float,impulse:Vector2,kind:String="contact",volley
 	var gentle:bool=kind=="flame"
 	if not p.alive or p.respawn>0 or (p.invincible>0 and not continuation):return
 	if gentle:p.burn=1.25
-	p.hp-=damage;p.vel+=impulse*(1+(100-p.hp)/75)*(.28 if continuation else 1.0)
+	p.hp-=damage*self.damage;p.vel+=impulse*(1+(100-p.hp)/75)*(.28 if continuation else 1.0)
 	if not continuation and not gentle:p.vel.y+=3
 	p.anchor={};p.invincible=.065;p.last_volley=volley;p.hit_dir=impulse.normalized()
 	var offset:Vector2=(contact-p.pos)/FROG_SCALE if contact.is_finite() else -p.hit_dir*.34
@@ -945,7 +951,7 @@ func spawn_wave()->void:
 
 func hurt_enemy(enemy:Dictionary,damage:float,impulse:Vector2,weapon:String)->void:
 	if enemy.hp<=0:return
-	enemy.hp-=damage;enemy["flash"]=.14
+	enemy.hp-=damage*self.damage;enemy["flash"]=.14
 	enemy["vel"]=enemy.get("vel",Vector2.ZERO)+impulse*(.2 if enemy.get("kind","")=="boss" else 1.0)
 	var color:=Color(ENEMY_STATS.get(enemy.get("kind","bee"),ENEMY_STATS.bee).color)
 	burst(enemy.pos,color,2 if weapon=="flame" else 5)
@@ -1033,8 +1039,8 @@ func bot(p:Dictionary)->Dictionary:
 	var can_fire:bool=armed and best<INF and distance<range_limit and bot_clear_shot(p.pos+aim*.7*FROG_SCALE,prediction)
 	if p.weapon=="burr" and distance<5.0:can_fire=false
 	if target_id!=p.get("bot_target",-2) or not armed:
-		p["bot_target"]=target_id;p["bot_ready"]=clock+.65;p["bot_aim_at"]=0.0
-	if not can_fire:p["bot_ready"]=clock+.45
+		p["bot_target"]=target_id;p["bot_ready"]=clock+.65*bot_reaction;p["bot_aim_at"]=0.0
+	if not can_fire:p["bot_ready"]=clock+.45*bot_reaction
 	var desired:float={"flame":2.7,"bramble":4.2,"acorn":7.0,"seed":7.5,"rail":9.0,"grenade":6.0,"burr":7.0}.get(p.weapon,.3)
 	var move:=Vector2(signf(delta.x) if absf(delta.x)>desired else 0,0)
 	var jump:bool=p.jump_prev and p.ground<0 and p.vel.y>0
@@ -1080,9 +1086,9 @@ func bot(p:Dictionary)->Dictionary:
 	if can_fire and not tongue:
 		# Aim is sampled slowly, with imperfect lead and a small persistent error.
 		if clock>=p.get("bot_aim_at",0.0):
-			p["bot_aim"]=aim.rotated(rng.randf_range(-.09,.09));p["bot_aim_at"]=clock+rng.randf_range(.24,.36)
+			p["bot_aim"]=aim.rotated(rng.randf_range(-.09,.09));p["bot_aim_at"]=clock+rng.randf_range(.24,.36)*bot_reaction
 		aim=p.get("bot_aim",aim)
-	var firing:bool=can_fire and clock>=p.get("bot_ready",clock+.65) and fposmod(clock+p.slot*.31,1.35)<.50
+	var firing:bool=can_fire and clock>=p.get("bot_ready",clock+.65*bot_reaction) and fposmod(clock+p.slot*.31,1.35)<.50
 	return {"move":move,"aim":aim,"jump":jump,"tongue":tongue,"fire":firing}
 
 func bot_surface(shelf:Dictionary)->bool:

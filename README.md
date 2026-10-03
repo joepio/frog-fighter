@@ -322,3 +322,7 @@ Destroyed sections leave real gaps in collision, shooting cover and tongue ancho
 Both new levels are available in the single start/pause menu and in Tour. Start directly with `-- --arena=beaver_dam` or `-- --arena=shatter_spire`.
 
 Run `godot --headless --path . --script res://tests/destruction.gd` for accumulated damage, actual weapon impacts, collision/cover gaps, anchor release, support cascades, bounded debris, rendering, safe spawns, navigation and bot combat.
+
+## Assistant controls
+
+See [GameNight settings](docs/gamenight-settings.md) for all supported tweaks, their ranges and when they apply. The phone and lobby assistant discover these controls automatically from the running game.

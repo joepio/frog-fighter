@@ -3,6 +3,7 @@ const Simulation=preload("res://src/simulation.gd")
 const World=preload("res://src/world.gd")
 const Hud=preload("res://src/hud.gd")
 const Bridge=preload("res://src/bridge.gd")
+var settings = preload("res://src/settings.gd").new()
 var sim:RefCounted
 var world:Node3D
 var hud:Control
@@ -43,11 +44,9 @@ func _ready()->void:
 	bridge.disposed.connect(dispose_managed)
 	bridge.roster_changed.connect(update_profiles)
 	bridge.daemon_disconnected.connect(func():get_tree().quit())
-	bridge.setting_changed.connect(func(key:String,value:Variant):
-		if key=="mode" and str(value) in ["versus","survival"]:selected_mode=str(value)
-		if key=="arena" and str(value) in Simulation.Arenas.IDS+["cycle"]:selected_arena=str(value))
+	bridge.setting_changed.connect(setting_changed)
 	add_child(bridge)
-	bridge.declare_settings([{"key":"mode","label":"Mode (next round)","kind":"choice","default":"versus","options":["versus","survival"]},{"key":"arena","label":"Arena (next match)","kind":"choice","default":"terrarium","options":Simulation.Arenas.IDS+["cycle"]}])
+	bridge.declare_settings(settings.SPECS)
 	var layer:=CanvasLayer.new();add_child(layer)
 	hud=Hud.new();hud.game=self;hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);layer.add_child(hud)
 	for arg in OS.get_cmdline_user_args():
@@ -61,6 +60,13 @@ func _ready()->void:
 	elif demo:start_local()
 	else:show_menu()
 	if not headless and not bridge.launched_by_daemon and fullscreen:get_window().mode=Window.MODE_FULLSCREEN
+
+func setting_changed(key:String,value:Variant)->void:
+	if not settings.change(key,value):return
+	if key=="mode":selected_mode=value
+	elif key=="arena":selected_arena=value
+	elif key=="lives":round_lives=int(value)
+	if sim!=null:settings.apply_live(sim)
 
 func load_settings()->void:
 	var config:=ConfigFile.new()
@@ -146,8 +152,10 @@ func new_round()->void:
 	var arena:String=Simulation.Arenas.IDS[arena_round%Simulation.Arenas.IDS.size()] if selected_arena=="cycle" else selected_arena
 	sim=Simulation.new(roster,selected_mode,next_round,arena);next_round+=1
 	if not in_menu:arena_round+=1
-	if not bridge.launched_by_daemon:
-		for p in sim.frogs:p.lives=round_lives;p["starting_lives"]=round_lives
+	settings.apply_live(sim)
+	for p in sim.frogs:
+		p.lives=int(settings.values.lives) if bridge.launched_by_daemon else round_lives
+		p["starting_lives"]=p.lives
 	world=World.new();add_child(world);world.build(sim);results_time=0
 
 func _physics_process(dt:float)->void:
