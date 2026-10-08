@@ -1,9 +1,6 @@
 extends "res://addons/gamenight/gamenight.gd"
-## The vendored SDK provides WebSocket transport. This adapter implements the
-## current contract: host input, session guards, no focus-driven transitions.
-signal roster_changed(seats: Array, players: Array, presence: Array)
-var session := ""
-var phase := "idle"
+## The vendored SDK provides transport and the session lifecycle. This adapter
+## adds host input by controller token and no focus-driven transitions.
 var frames: Dictionary = {}
 var frame_at := -10000
 var connected_at := 0
@@ -30,55 +27,25 @@ func _handle(msg: Variant) -> void:
 	if not msg is Dictionary:
 		return
 	var kind: String = msg.get("type", "")
-	if kind == "welcome":
-		if msg.get("protocol_version", 0) != 1:
-			get_tree().quit(1)
-			return
-		super._handle(msg)
-	elif kind == "controller_frame":
+	if kind == "welcome" and msg.get("protocol_version", 0) != 1:
+		get_tree().quit(1)
+		return
+	if kind == "controller_frame":
+		# Menus read controllers by token before a match runs, so keep every frame.
 		frames.clear()
 		frame_at = Time.get_ticks_msec()
 		for frame in msg.get("controllers", []):
 			var token: String = frame.get("controller", "")
 			if not token.is_empty() and not frames.has(token):
 				frames[token] = frame
-	elif kind == "prepare":
-		if msg.get("game", "") != game_id or msg.get("session", "") == session:
-			return
-		if not session.is_empty():
-			disposed.emit(session)
-		session = msg.get("session", "")
-		phase = "preparing"
-		prepared.emit(session, msg.get("seats", []), msg.get("players", []))
-	elif kind == "setting_changed" or kind == "error":
-		super._handle(msg)
-	elif not session.is_empty() and msg.get("session", "") == session:
-		match kind:
-			"start":
-				if phase == "ready":
-					phase = "running"
-					started.emit(session)
-			"pause":
-				if phase == "running":
-					phase = "paused"
-					paused.emit(session)
-			"resume":
-				if phase == "paused":
-					phase = "running"
-					resumed.emit(session)
-			"dispose":
-				disposed.emit(session)
-				session = ""
-				phase = "idle"
-				frames.clear()
-			"party_updated":
-				roster_changed.emit(msg.get("seats", []), msg.get("players", []), msg.get("presence", []))
+	elif kind == "dispose" and not session.is_empty() and msg.get("session", "") == session:
+		frames.clear()
+	super._handle(msg)
 
 func ready_for_session(value: String) -> void:
 	if session != value or phase != "preparing":
 		return
 	_send({"type": "participation", "session": session, "instant_join": false})
-	phase = "ready"
 	notify_ready(session)
 
 func frame(token: String) -> Dictionary:
