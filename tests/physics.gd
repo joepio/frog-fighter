@@ -54,8 +54,10 @@ func _initialize()->void:
 	s.fire(p)
 	check(top.vel.x>5 and absf(top.omega)>.2,"Rail shot hits the side and adds spin to a stone or log")
 	check(not top.get("sleeping",false),"Weapon impact wakes resting props")
-	var anchor:Dictionary=s.cast_tongue(top.pos+Vector2(3,0),Vector2.LEFT)
-	check(anchor.get("platform",-1)==s.platforms.find(top),"Tongue can grab the side of a loose block")
+	# Close enough that the block's side is the nearest target; from further out the
+	# corner of the wider log below it is nearer and wins.
+	var anchor:Dictionary=s.cast_tongue(top.pos+Vector2(1.5,0),Vector2.LEFT)
+	check(anchor.get("platform",-1)==s.platforms.find(top) and absf(anchor.offset.x-top.width*.5)<.05,"Tongue can grab the side of a loose block")
 	check(not s.bot_clear_shot(top.pos+Vector2(-2,0),top.pos+Vector2(2,0)),"Loose blocks provide real weapon cover")
 	s=game();advance(s,2);pieces=s.platforms.filter(func(b):return b.kind=="loose" and not b.get("rubble",false))
 	s.explode_grenade({"pos":Vector2(-1.4,17),"life":1.0,"owner":0,"volley":17})

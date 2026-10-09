@@ -46,7 +46,9 @@ func run()->void:
 	check(world.frogs[0].open_mouth.visible and not world.frogs[0].closed_mouth.visible,"Tongue input opens mouth even before attaching")
 	s.update_frog(p,{"fire":true},1.0/120);world.update()
 	check(world.frogs[0].brows[0].visible and world.frogs[0].brows[1].visible,"Holding trigger shows angry brows")
-	check(not world.frogs[0].open_mouth.visible,"Releasing tongue closes mouth")
+	check(world.frogs[0].open_mouth.visible,"An empty-air tongue keeps the mouth open while it snaps back")
+	p.tongue_miss=0;world.update()
+	check(not world.frogs[0].open_mouth.visible,"Releasing tongue closes mouth once it is back")
 	s.update_frog(p,{},1.0/120);p.shot_age=10;world.update()
 	check(not world.frogs[0].brows[0].visible,"Releasing trigger returns to neutral expression")
 	p.pos=Vector2(0,3.2+Sim.RADIUS);p.vel=Vector2.ZERO;p.ground=0;p.anchor={};p.jump_prev=false

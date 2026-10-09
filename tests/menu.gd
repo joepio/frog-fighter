@@ -45,7 +45,8 @@ func run()->void:
 	for item in game.hud.menu.get_children():
 		if item.get_meta("menu_key","")=="restart":item.pressed.emit();break
 	check(not game.in_menu and not game.paused_local and game.sim.frogs.size()==3 and game.sim.frogs[0].lives==1,"New match applies settings directly from the pause menu")
-	check(game.find_children("*","AudioStreamPlayer",true,false).is_empty(),"No sound effect players are created")
+	var players:=game.find_children("*","AudioStreamPlayer",true,false)
+	check(players.size()==game.game_audio.voices.size() and players.all(func(v):return v.get_parent()==game.game_audio),"Sound effects only use the bounded voice pool")
 	game.sim.over=true;game.sim.winner="Ripple"
 	for i in range(3):await physics_frame
 	check(game.sim.over and game.celebrating,"Result holds the current arena for the victory lap")

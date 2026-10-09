@@ -72,5 +72,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Flame damage and afterburn failed' }
           & $godot --headless --path . --script res://tests/quick_maps.gd
           if ($LASTEXITCODE -ne 0) { throw 'Compact arenas and box towers failed' }
+          & $godot --headless --path . --script res://tests/audio_bank.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Audio cue bank failed' }
           python tests/integration.py --godot $godot
           if ($LASTEXITCODE -ne 0) { throw 'Host lifecycle failed' }
