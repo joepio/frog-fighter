@@ -348,7 +348,8 @@ func prepare(session:String,seats:Array,players:Array)->void:
 		used_tokens[token]=true
 		roster.append({"slot":slot,"id":id,"name":profile.get("name","Frog %d"%(slot+1)),"color":profile.get("color",Simulation.COLORS[slot%4]),"skin_color":profile.get("skin_color","#eac794"),"avatar":profile.get("avatar",{}),"bot":occupant.get("kind")=="ai","controller":token})
 	new_round();quiet_window()
-	if not headless:await RenderingServer.frame_post_draw
+	# A hidden, warming window never draws, so frame_post_draw would never fire.
+	if not headless and get_window().visible:await RenderingServer.frame_post_draw
 	else:await get_tree().process_frame
 	bridge.ready_for_session(session)
 
