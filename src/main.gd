@@ -45,7 +45,10 @@ func _ready()->void:
 	headless=DisplayServer.get_name()=="headless"
 	Engine.max_fps=120
 	load_settings()
-	bridge=Bridge.new()
+	# The GameNight autoload, with GameNightScreen keeping its window off the
+	# party's screen while warming. Scenes run without it make their own.
+	bridge=get_node_or_null("/root/GameNight")
+	if bridge==null:bridge=Bridge.new();add_child(bridge)
 	bridge.prepared.connect(prepare)
 	bridge.started.connect(start_managed)
 	bridge.resumed.connect(start_managed)
@@ -54,7 +57,6 @@ func _ready()->void:
 	bridge.roster_changed.connect(update_profiles)
 	bridge.daemon_disconnected.connect(func():get_tree().quit())
 	bridge.setting_changed.connect(setting_changed)
-	add_child(bridge)
 	bridge.declare_settings(settings.SPECS)
 	var layer:=CanvasLayer.new();add_child(layer)
 	hud=Hud.new();hud.game=self;hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);layer.add_child(hud)
@@ -65,10 +67,14 @@ func _ready()->void:
 		elif arg.begins_with("--players="):human_count=clampi(int(arg.get_slice("=",1)),1,4)
 		elif arg.begins_with("--capture="):capture_path=arg.trim_prefix("--capture=")
 		elif arg.begins_with("--capture-frame="):capture_frame=int(arg.get_slice("=",1))
-	if bridge.launched_by_daemon:in_menu=false;quiet_window()
+	if bridge.launched_by_daemon:in_menu=false
 	elif demo:start_local()
 	else:show_menu()
-	if not headless and not bridge.launched_by_daemon and fullscreen:get_window().mode=Window.MODE_FULLSCREEN
+	# The project boots minimized so a warming launch never flashes a window;
+	# a standalone launch claims the screen itself.
+	if not headless and not bridge.launched_by_daemon:
+		get_window().mode=Window.MODE_FULLSCREEN if fullscreen else Window.MODE_WINDOWED
+		DisplayServer.window_move_to_foreground()
 
 func setting_changed(key:String,value:Variant)->void:
 	if not settings.change(key,value):return
@@ -116,7 +122,7 @@ func set_arena(value:String)->void:
 
 func set_fullscreen(value:bool)->void:
 	fullscreen=value
-	if not headless:get_window().mode=Window.MODE_FULLSCREEN if fullscreen else Window.MODE_WINDOWED
+	if not headless and not bridge.launched_by_daemon:get_window().mode=Window.MODE_FULLSCREEN if fullscreen else Window.MODE_WINDOWED
 	save_settings()
 	if in_menu:hud.make_menu()
 
@@ -347,32 +353,23 @@ func prepare(session:String,seats:Array,players:Array)->void:
 		if used_tokens.has(token) and not token.is_empty():token=""
 		used_tokens[token]=true
 		roster.append({"slot":slot,"id":id,"name":profile.get("name","Frog %d"%(slot+1)),"color":profile.get("color",Simulation.COLORS[slot%4]),"skin_color":profile.get("skin_color","#eac794"),"avatar":profile.get("avatar",{}),"bot":occupant.get("kind")=="ai","controller":token})
-	new_round();quiet_window()
-	# A hidden, warming window never draws, so frame_post_draw would never fire.
-	if not headless and get_window().visible:await RenderingServer.frame_post_draw
+	new_round()
+	# A minimized, warming window never draws, so frame_post_draw would never fire.
+	if not headless and DisplayServer.window_get_mode()!=DisplayServer.WINDOW_MODE_MINIMIZED:await RenderingServer.frame_post_draw
 	else:await get_tree().process_frame
 	bridge.ready_for_session(session)
 
 func start_managed(_session:String)->void:
 	running=true;back_release=0
-	if not headless:
-		get_window().position=DisplayServer.screen_get_position();get_window().show();get_window().grab_focus()
-	AudioServer.set_bus_mute(0,false)
 
 func pause_managed(_session:String)->void:
-	running=false;quiet_window()
+	running=false
 
 func dispose_managed(_session:String)->void:
 	discard_prepared();celebrating=false;victory_time=0
-	running=false;quiet_window();roster=[];sim=null
+	running=false;roster=[];sim=null
 	if is_instance_valid(world):remove_child(world);world.queue_free()
 	world=null
-
-func quiet_window()->void:
-	AudioServer.set_bus_mute(0,true)
-	if not headless:
-		get_window().borderless=true;get_window().size=DisplayServer.screen_get_size()+Vector2i(0,1)
-		get_window().position=Vector2i(-20000,-20000);get_window().hide()
 
 func update_profiles(_seats:Array,players:Array,_presence:Array)->void:
 	if sim==null:return
@@ -396,6 +393,6 @@ func write_probe()->void:
 	var players:Array=[]
 	if sim!=null:
 		for p in sim.frogs:players.append({"name":p.name,"x":p.pos.x,"y":p.pos.y,"lives":p.lives,"bot":p.bot,"controller":p.get("controller","")})
-	var data:={"phase":bridge.phase,"session":bridge.session,"running":running,"clock":sim.clock if sim!=null else 0,"countdown":sim.countdown if sim!=null else 0,"players":players,"visible":get_window().visible,"muted":AudioServer.is_bus_mute(0)}
+	var data:={"phase":bridge.phase,"session":bridge.session,"running":running,"clock":sim.clock if sim!=null else 0,"countdown":sim.countdown if sim!=null else 0,"players":players,"visible":DisplayServer.window_get_mode()!=DisplayServer.WINDOW_MODE_MINIMIZED,"muted":AudioServer.is_bus_mute(0)}
 	var file:=FileAccess.open(path,FileAccess.WRITE)
 	if file:file.store_string(JSON.stringify(data))

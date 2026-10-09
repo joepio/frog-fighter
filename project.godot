@@ -5,11 +5,17 @@ config/name="Frog Fighter"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 
+[autoload]
+
+GameNight="*res://src/bridge.gd"
+GameNightScreen="*res://addons/gamenight/screen.gd"
+
 [display]
 window/size/viewport_width=1600
 window/size/viewport_height=900
 window/size/window_width_override=1280
 window/size/window_height_override=720
+window/size/mode=1
 window/stretch/mode="canvas_items"
 
 [rendering]
