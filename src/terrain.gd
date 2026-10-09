@@ -5,7 +5,7 @@ const ROCK_TOP:=.85
 const ROCK_WIDTH:=1.3
 static func rocks(arena:String)->Array:
 	var out:Array=[]
-	if arena in ["reed_delta","sky_ruins","deadfall","grotto","beaver_dam","shatter_spire"]:return out
+	if arena not in preload("res://src/arenas.gd").CLASSIC_IDS:return out
 	if arena=="terrarium":out.append({"pos":Vector3(0,2.2,-.15),"size":Vector3(1.9,1.7,1.3)})
 	for side in [-1,1]:
 		for i in range(5):

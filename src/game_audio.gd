@@ -1,0 +1,4 @@
+extends "res://src/cue_bank.gd"
+
+func _ready() -> void:
+	configure({"jump": ["step", -17, 0.055, 1.15, false], "land": ["step", -15, 0.075, 0.85, false], "tongue": ["air", -18, 0.12, 1.5, false], "pickup": ["bell", -19, 0.12, 1.3, true], "collapse": ["wood", -12, 0.08, 0.7, false], "fire_acorn": ["wood", -12, 0.05, 0.85, false], "fire_seed": ["click", -21, 0.055, 1.35, false], "fire_bramble": ["heavy", -14, 0.06, 1.25, false], "fire_flame": ["air", -21, 0.16, 0.7, false], "fire_rail": ["metal", -17, 0.1, 1.25, false], "fire_grenade": ["soft", -13, 0.08, 0.7, false], "fire_burr": ["soft", -14, 0.08, 0.8, false], "hit": ["heavy", -16, 0.055, 1.0, false], "splat": ["soft", -11, 0.15, 0.65, false], "wood": ["wood", -23, 0.085, 1.4, false], "explosion": ["blast", -13, 0.13, 0.95, false], "win": ["success", -16, 1.0, 1.0, true]})

@@ -1,4 +1,5 @@
 extends Node
+var game_audio = preload("res://src/game_audio.gd").new()
 const Simulation=preload("res://src/simulation.gd")
 const World=preload("res://src/world.gd")
 const Hud=preload("res://src/hud.gd")
@@ -42,6 +43,7 @@ var probe_timer:=0.0
 var render_msec:Array[float]=[]
 
 func _ready()->void:
+	add_child(game_audio)
 	headless=DisplayServer.get_name()=="headless"
 	Engine.max_fps=120
 	load_settings()
@@ -224,6 +226,7 @@ func _physics_process(dt:float)->void:
 	if sim==null or paused_local or (not running and not in_menu):return
 	if sim.over and not celebrating:
 		celebrating=true;victory_time=0
+		if not in_menu: game_audio.play_cue("win")
 		last_result=sim.winner+(" wins" if sim.mode=="versus" and sim.winner!="Draw" else "")
 		result_banner_time=2.0
 		if sim.mode=="survival":best_wave=maxi(best_wave,sim.wave);save_settings()
@@ -234,7 +237,11 @@ func _physics_process(dt:float)->void:
 		if victory_time>=2.0 and not preparing:new_round(true)
 	var inputs:Array=[]
 	for p in sim.frogs:inputs.append({} if in_menu else (sim.bot(p) if p.bot else controls(p)))
+	if not world.fx_ready:
+		sim.update_aim(inputs);return
 	sim.step(dt,inputs)
+	if running and not in_menu:
+		for cue in sim.events: game_audio.play_cue(cue)
 
 func controls(p:Dictionary)->Dictionary:
 	if bridge.launched_by_daemon:
@@ -278,6 +285,7 @@ func key(code:int)->bool:return Input.is_physical_key_pressed(code)
 func deadzone(value:float)->float:return signf(value)*maxf(0,(absf(value)-.17)/.83)
 
 func _process(dt:float)->void:
+	game_audio.set_active(running and not in_menu, paused_local)
 	if not paused_local and (running or in_menu):prepare_next_round()
 	process_back(dt)
 	if sim!=null and (running or in_menu) and not paused_local:world.update()

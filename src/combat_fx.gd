@@ -39,6 +39,7 @@ func build(world:Node3D)->void:
 	for i in range(64):
 		var root:=Node3D.new();add_child(root)
 		var mat:=glow(Color.WHITE)
+		var additive:=glow(Color.WHITE);additive.blend_mode=BaseMaterial3D.BLEND_MODE_ADD
 		var flash:MeshInstance3D=host.mesh(root,star,Vector3.ZERO,Vector3.ONE,mat)
 		var halo:MeshInstance3D=host.mesh(root,ring,Vector3.ZERO,Vector3.ONE,mat);halo.rotation.x=PI/2
 		var smoke:MeshInstance3D=host.ball(root,Vector3.ZERO,Vector3.ONE,Color.WHITE);smoke.material_override=mat
@@ -53,7 +54,7 @@ func build(world:Node3D)->void:
 		var soot_mat:=FlameStyle.material(true)
 		var soot:MeshInstance3D=host.mesh(root,quad,Vector3.ZERO,Vector3.ONE,soot_mat);soot.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		for node in [flash,halo,smoke]:node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		root.visible=false;bursts.append({"root":root,"flash":flash,"halo":halo,"smoke":smoke,"mat":mat,"clouds":clouds,"mist_mat":mist_mat,"fire":fire,"flame_mat":flame_mat,"soot":soot,"soot_mat":soot_mat})
+		root.visible=false;bursts.append({"root":root,"flash":flash,"halo":halo,"smoke":smoke,"mat":mat,"additive":additive,"clouds":clouds,"mist_mat":mist_mat,"fire":fire,"flame_mat":flame_mat,"soot":soot,"soot_mat":soot_mat})
 	var trail_mat:=glow(Color(1,.79,.35,.65))
 	for i in range(128):
 		var root:=Node3D.new();add_child(root)
@@ -121,13 +122,16 @@ func update(sim:RefCounted)->void:
 		var is_muzzle:bool=effect.kind=="muzzle"
 		var is_ko:bool=effect.kind=="ko"
 		var color:=Color("ffe9a9")
-		if effect.weapon=="bramble":color=Color("f6cce6")
+		if effect.weapon=="bramble":color=Color("f6e8c6")
 		if effect.weapon=="rail":color=Color("aefff1")
 		if effect.weapon=="grenade":color=Color("ffc75d")
 		if is_ko:color=Color("e5434c") if t>.16 else Color("fff3d2")
 		if effect.kind=="wood":color=Color("d7b27a")
-		if is_smoke:color=Color("c2bba1") if effect.weapon!="bramble" else Color("c9acc9")
-		color.a=pow(1-t,2)*(.24 if is_smoke else 1.0);b.mat.albedo_color=color
+		if is_smoke:color=Color("c2bba1")
+		color.a=pow(1-t,2)*(.24 if is_smoke else 1.0)
+		var material:Material=b.additive if effect.kind in ["rail","explosion"] else b.mat
+		material.albedo_color=color
+		for node in [b.flash,b.halo,b.smoke]:node.material_override=material
 		var pos:Vector2=effect.pos
 		if is_smoke:pos+=effect.dir*t*.6+Vector2(0,t*.4)
 		if is_mist:pos+=effect.dir*t*(.8 if effect.kind=="mist" else 1.2)+Vector2(0,t*.25)
@@ -146,7 +150,7 @@ func update(sim:RefCounted)->void:
 		b.flash.visible=not is_mist and not is_flame and not is_soot and not is_smoke and (is_muzzle or t<.42)
 		b.halo.visible=not is_mist and not is_flame and not is_soot and not is_smoke and not is_muzzle
 		b.smoke.visible=is_smoke
-		var size_value:float=(.72 if effect.weapon=="bramble" else .45) if is_muzzle else (.85 if is_ko else .36)
+		var size_value:float=(.56 if effect.weapon=="bramble" else .38) if is_muzzle else (.85 if is_ko else .36)
 		b.flash.scale=Vector3(size_value*(1-t*.65),size_value*(.6 if is_muzzle else 1.0)*(1-t*.6),1)
 		b.halo.scale=Vector3.ONE*size_value*(.22+t*1.15)
 		b.smoke.scale=Vector3(.25+t*.65,.17+t*.4,.08)
@@ -154,17 +158,14 @@ func update(sim:RefCounted)->void:
 		for j in range(3):b.clouds[j].scale=Vector3(cloud_size*(1+j*.15),cloud_size*.65,1)
 		b.fire.scale=Vector3(flame_length*.5,(.40+t*.90)*minf(1,reach/.5),1)
 		b.soot.scale=Vector3(.40+t*.95,.4+t*1.05,1)
-		b.mat.blend_mode=BaseMaterial3D.BLEND_MODE_MIX
 		if effect.kind=="rail":
 			var length:float=effect.get("length",1.0)
 			b.flash.visible=false;b.halo.visible=false;b.smoke.visible=true
 			b.root.position+=Vector3(effect.dir.x,effect.dir.y,0)*length*.5
 			b.smoke.scale=Vector3(length*.5,.025+.055*(1-t),.025)
-			b.mat.blend_mode=BaseMaterial3D.BLEND_MODE_ADD
 		if effect.kind=="explosion":
 			b.flash.scale=Vector3.ONE*(.7+t*2.8)
 			b.halo.scale=Vector3.ONE*(.3+t*2.8)
-			b.mat.blend_mode=BaseMaterial3D.BLEND_MODE_ADD
 	for i in range(bullets.size()):
 		var b:Dictionary=bullets[i];b.root.visible=i<sim.shots.size() and sim.shots[i].kind!="flame"
 		if not b.root.visible:continue

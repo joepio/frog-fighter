@@ -2,7 +2,7 @@
 
 [Download for Windows](https://github.com/joepio/frog-fighter/releases/latest) · [GameNight store](https://gamenight.ontola.io/catalog#game=frog-fighter)
 
-Free, open-source party combat for 1–4 local players. Includes versus, survival, ten arenas, seven weapons, tongue grappling and destructible scenery. Contains exaggerated cartoon blood and dismemberment.
+Free, open-source party combat for 1–4 local players. Includes versus, survival, fifteen arenas, seven weapons, tongue grappling and destructible scenery. Contains exaggerated cartoon blood and dismemberment.
 
 Unzip the Windows release and run **FrogFighter.exe**. Keep the PCK beside it. No Godot installation is needed. GameNight can install the same release from its catalog.
 
@@ -63,10 +63,15 @@ Choose **Level** in the same menu with left/right:
 - **Glow Grotto:** a 32×24 mushroom cave with safe water. Blue caps are permanent; cracked violet caps fall. Bramble blasters suit the lower paths, repeaters start higher, the central flamethrower controls nearby crossings and the railgun rewards a climb to the crown.
 - **Beaver Dam:** timber gates, a roof that collapses when both posts break, destructible crossing routes and safe water.
 - **Shatter Spire:** a stone tower whose supports can be shot out, permanent outer ledges and a lethal chasm.
-- **Tour:** rotate through all ten arenas after each match (not between survival waves).
+- **Puddle Duel:** a 16×9 pond for quick close-range fights, with a central seesaw, bramble blasters and flamethrowers.
+- **Bell Tower:** a narrow 12×22 climb, exposed roof, lethal bottom, moving lift and a railgun at the crown.
+- **Last Leaf:** a 20×11 autumn gap with a collapsing bridge, an upper swing and dangerous open sides.
+- **Matchbox:** an 18×12 brawl around wooden walls and a supported roof; flames and grenades open new routes.
+- **Box Pillars:** two stone plinths with ten loose, cross-braced boxes. Shoot or grapple boxes out of their towers; the railgun and grenade launcher start on top. Stone bases can also be destroyed. Falling is lethal.
+- **Tour:** rotate through all fifteen arenas after each match (not between survival waves).
 
-Every arena supports versus and survival and has four permanent spawn perches
-with nearby weapon pickups. The original four keep their safe ponds and walls;
+Every arena supports versus and survival and has four safe starting positions
+with nearby weapon pickups; some supports can be destroyed during the fight. The original four keep their safe ponds and walls;
 new arenas declare their own size, walls, ceiling, and bottom hazard. Movement
 speed, frog size, jump height, and tongue reach stay the same. The camera fits
 each arena. Open sides allow ring-outs; falling into a chasm costs one life.
@@ -91,6 +96,7 @@ For a direct source launch, add `-- --arena=vineway` (or `canopy`, `floodplain`,
 |---|---|---|
 | Move / steer a swing | Left stick | A / D |
 | Jump (hold for height) | LB (A also works) | Space |
+| Drop through a platform | Left stick down + LB / A | S + Space |
 | Aim weapon and tongue | Right stick | Mouse |
 | Shoot | RT / RB | Left click / F |
 | Tongue grapple, hold to stay attached | LT | Right click / Q |
@@ -108,7 +114,10 @@ are kept until empty or thrown with X/E. Throws follow your aim, preserve remain
 ammo, and can be caught by another frog. A brief owner lockout prevents instant
 re-pickup. A jump releases a tongue or wall
 grip. There is no air jump: use tongue anchors to reach the hanging shelves.
-Platforms can be jumped through from underneath. Tongues attach to platform
+Platforms can be jumped through from underneath or dropped through with down + jump.
+A drop ignores only the current shelf, so the next one catches you. Release jump
+before dropping again; rocks, water, and solid physics props remain solid. The tongue selects nearby visible edges in a generous forward aiming cone;
+empty-air shots extend and retract without creating an anchor. Tongues attach to platform
 tops, curled vine grips, the overhead branch, or the terrarium's side walls and follow moving
 anchors. Walls hold you automatically; jump or move away to release.
 B/Shift still holds to platform undersides. Wall jumps have a short outward push
@@ -178,12 +187,17 @@ of a sparse offset grid. Frog smiles are continuous curves fitted to the face.
 
 ## Weapon feedback
 
+Explosion, smoke, spark, and instanced gore materials are drawn in a small
+offscreen viewport during startup to warm the Compatibility renderer before
+combat. Additive flashes keep a separate material instead of switching blend
+modes on impact.
+
 | Weapon | Shot spacing | Damage | Hit-stop | Feel |
 |---|---:|---:|---:|---|
 | Acorn Cannon | 580 ms | 24 | 55 ms | Bark barrel, heavy acorn, vine bindings |
 | Pine Repeater | 120 ms | 9 | 18 ms | Pine-cone chamber, rapid needles |
 | Bramble Blaster | 820 ms | 10 × 5 thorns | 45 ms | Briar-wrapped pod, wide thorn blast |
-| Dragonpod | 75 ms | 3.5 | None on normal hits | Sap pod, reed nozzle, continuous flame and warm light |
+| Dragonpod | 75 ms | 7.5 close → 3 at tip; 12/s burn | None on normal hits | Sap pod, reed nozzle, continuous flame and warm light |
 | Burr Bomb | 1150 ms (160 ms windup) | Up to 145 | 85 ms | Hand-thrown thorn pod, contact detonation, 4.4-unit blast |
 
 Impact feedback runs on a separate presentation clock: a local cream flash and
@@ -196,6 +210,10 @@ squishy organ shapes (heart-like, bean-shaped, and curled), a broader mist,
 and a small secondary spray at 75 ms. Short
 shared-screen freezes do not stack; jumps and throw presses are buffered.
 All thorns in one bramble volley can register, with one hit sound/flash per victim.
+Flame hits refresh a 1.6-second burn on frogs and survival enemies. The burn deals
+12 damage per second without extra knockback or hit pauses, and water extinguishes it.
+Direct flame damage is strongest within 1.5 units of the muzzle and tapers toward
+the tip. The live damage multiplier applies to direct hits and burning.
 The Dragonpod carries 70 fuel units and reaches roughly five world units. Its
 continuous damage does not emit blood blobs or repeated hit-stop; hit flashes
 are throttled. Hits ignite body-attached flames, rising embers, soft smoke, and
@@ -330,3 +348,9 @@ Run `godot --headless --path . --script res://tests/destruction.gd` for accumula
 ## Assistant controls
 
 See [GameNight settings](docs/gamenight-settings.md) for all supported tweaks, their ranges and when they apply. The phone and lobby assistant discover these controls automatically from the running game.
+
+## Audio and action feedback
+
+Audio uses five cached takes per material for jumps, landings, tongue casts, weapons, impacts, pickups and round wins. Sounds consume simulation events and pause with play. Bramble muzzle flashes use pale warm light and neutral smoke. Sound credits: `third_party/SOUND-CREDITS.txt`.
+
+Fresh Windows builds for this pass are in `build/audio-fx/`.

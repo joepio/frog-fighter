@@ -50,12 +50,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Survival enemies and bosses failed' }
           & $godot --headless --path . --script res://tests/arenas.gd
           if ($LASTEXITCODE -ne 0) { throw 'Arena movement and spawns failed' }
+          & $godot --headless --path . --script res://tests/drop_through.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Drop-through platforms failed' }
           & $godot --headless --path . --script res://tests/terrain.gd
           if ($LASTEXITCODE -ne 0) { throw 'Rock landing and safe water failed' }
           & $godot --headless --path . --script res://tests/expansion.gd
           if ($LASTEXITCODE -ne 0) { throw 'Expanded arenas, hazards and collapse failed' }
           & $godot --headless --path . --script res://tests/physics.gd
           if ($LASTEXITCODE -ne 0) { throw 'Physical ropes, stacks and impacts failed' }
+          & $godot --headless --path . --script res://tests/tongue_targeting.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Tongue edge selection and empty-air animation failed' }
           & $godot --headless --path . --script res://tests/tongue_physics.gd
           if ($LASTEXITCODE -ne 0) { throw 'Tongue momentum and pendulum stability failed' }
           & $godot --headless --path . --script res://tests/burr.gd
@@ -64,5 +68,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Destructible terrain and support cascades failed' }
           & $godot --headless --path . --script res://tests/transitions.gd
           if ($LASTEXITCODE -ne 0) { throw 'Responsive countdowns and reusable level transitions failed' }
+          & $godot --headless --path . --script res://tests/fire_balance.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Flame damage and afterburn failed' }
+          & $godot --headless --path . --script res://tests/quick_maps.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Compact arenas and box towers failed' }
           python tests/integration.py --godot $godot
           if ($LASTEXITCODE -ne 0) { throw 'Host lifecycle failed' }

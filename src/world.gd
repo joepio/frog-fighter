@@ -9,6 +9,7 @@ const Scenery=preload("res://src/scenery.gd")
 const Backdrop=preload("res://src/background.gd")
 const EnemyVisuals=preload("res://src/enemy_visuals.gd")
 const Landmarks=preload("res://src/landmarks.gd")
+var fx_ready:=false
 var combat:Node3D
 var sim:RefCounted
 var stage:Node3D
@@ -77,6 +78,14 @@ func build(state:RefCounted)->void:
 	build_stage()
 	build_actors()
 	update()
+	warm_effects()
+
+func warm_effects()->void:
+	if DisplayServer.get_name()=="headless":fx_ready=true;return
+	var warmup:=preload("res://src/fx_warmup.gd").new();add_child(warmup)
+	await warmup.run(self)
+	fx_ready=true
+	warmup.queue_free()
 
 func can_reuse(state:RefCounted)->bool:
 	if state.frogs.size()>frogs.size():return false
@@ -454,7 +463,7 @@ func update()->void:
 		# Keep the silhouette readable throughout hits and spawn protection.
 		# Eye squeeze, color flash and squash convey damage without hiding the frog.
 		f.body.visible=true
-		var speaking:bool=p.tongue_active or not p.anchor.is_empty()
+		var speaking:bool=p.tongue_active or p.tongue_miss>0 or not p.anchor.is_empty()
 		var angry:bool=p.trigger_held or p.shot_age<.18
 		f.closed_mouth.visible=not speaking;f.open_mouth.visible=speaking
 		for j in range(2):
@@ -478,8 +487,12 @@ func update()->void:
 			f.flashing=flashing
 		f.flash.set_shader_parameter("strength",clampf((p.flash-.12)/.04,0,.88))
 		for child in f.tongue.get_children():child.free()
-		if not p.anchor.is_empty():
-			var point:Vector2=(sim.anchor_point(p.anchor)-p.pos)/sim.FROG_SCALE
+		if not p.anchor.is_empty() or p.tongue_miss>0:
+			var point:Vector2
+			if not p.anchor.is_empty():point=(sim.anchor_point(p.anchor)-p.pos)/sim.FROG_SCALE
+			else:
+				var progress:float=1-p.tongue_miss/sim.TONGUE_MISS_DURATION
+				point=p.tongue_direction*sim.TONGUE_REACH*maxf(.015,sin(progress*PI))/sim.FROG_SCALE
 			tube(f.tongue,f.body.transform*Vector3(0,.15,.46),Vector3(point.x,point.y,.2),.055,Color("ed9da1"))
 			ball(f.tongue,Vector3(point.x,point.y,.2),Vector3(.13,.08,.13),Color("e88e99"))
 	for i in range(boxes.size()):

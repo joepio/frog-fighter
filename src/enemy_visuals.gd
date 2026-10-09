@@ -69,7 +69,8 @@ func make_enemy(kind:String)->Dictionary:
 	var flash:=ShaderMaterial.new();flash.shader=load("res://src/hit_flash.gdshader");flash.set_shader_parameter("strength",0.0)
 	var size:float={"bee":.80,"mosquito":.66,"bird":1.0,"boss":2.65}[kind]
 	root.scale=Vector3.ONE*size
-	return {"root":root,"body":body,"wings":wings,"eyes":eyes,"pupils":pupils,"lids":lids,"brows":brows,"mouth":mouth,"flash":flash,"meshes":meshes,"flashing":false,"kind":kind}
+	var burning:=preload("res://src/burning.gd").new();root.add_child(burning);burning.build(host)
+	return {"root":root,"body":body,"burning":burning,"wings":wings,"eyes":eyes,"pupils":pupils,"lids":lids,"brows":brows,"mouth":mouth,"flash":flash,"meshes":meshes,"flashing":false,"kind":kind}
 
 func update(sim:RefCounted)->void:
 	var living:Dictionary={}
@@ -84,6 +85,7 @@ func update(sim:RefCounted)->void:
 		var windup:bool=state=="windup";var striking:bool=state=="strike"
 		var blink:bool=enemy.get("flash",0.0)>.06 or fposmod(phase,3.7)<.095
 		v.root.position=Vector3(enemy.pos.x,enemy.pos.y,.43)
+		v.burning.update({"burn":enemy.get("burn",0.0),"alive":enemy.hp>0,"respawn":0.0,"vel":velocity},sim.fx_clock)
 		v.body.rotation.z=clampf(-velocity.x*.025,-.32,.32)
 		v.body.rotation.y=enemy.get("look",Vector2.ZERO).x*.20
 		v.body.scale=Vector3(1.10,.87,1.0) if windup else (Vector3(.91,1.10,1) if striking else Vector3.ONE)

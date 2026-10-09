@@ -93,6 +93,11 @@ static func loose_piece(host:Node3D,root:Node3D,piece:Dictionary)->void:
 	var mat:Material=(host.landmarks.bark if wood else host.landmarks.stone).duplicate()
 	mat.albedo_color=Color("bc9466") if wood else Color("a2b4af")
 	host.mesh(root,host.Scenery.rounded_box(size,.07),Vector3.ZERO,Vector3.ONE,mat)
+	if piece.get("crate",false):
+		# Cross braces distinguish the loose ammunition-box towers from bridge timber.
+		for side in [-1,1]:
+			host.tube(root,Vector3(-piece.width*.42,side*piece.height*.39,.48),Vector3(piece.width*.42,-side*piece.height*.39,.48),.045,Color("dec18b"))
+		for y in [-.42,.42]:host.block(root,Vector3(0,piece.height*y,.47),Vector3(piece.width*.93,.09,.06),Color("76583a"))
 	if wood:
 		# Pale sawn end grain and bark edges make the loose timber read separately.
 		for side in [-1,1]:
