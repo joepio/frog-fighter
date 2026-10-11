@@ -1,4 +1,5 @@
 extends Node
+var game_audio = preload("res://src/game_audio.gd").new()
 const Simulation=preload("res://src/simulation.gd")
 const World=preload("res://src/world.gd")
 const Hud=preload("res://src/hud.gd")
@@ -32,6 +33,7 @@ var pending_key:=""
 var preparing:=false
 var preparation_generation:=0
 var back_release:=0.0
+var managed_menu_buttons:=0xffffffff
 var activity_timer:=0.0
 var capture_path:=""
 var capture_frame:=180
@@ -42,6 +44,7 @@ var probe_timer:=0.0
 var render_msec:Array[float]=[]
 
 func _ready()->void:
+	add_child(game_audio)
 	headless=DisplayServer.get_name()=="headless"
 	Engine.max_fps=120
 	load_settings()
@@ -224,6 +227,7 @@ func _physics_process(dt:float)->void:
 	if sim==null or paused_local or (not running and not in_menu):return
 	if sim.over and not celebrating:
 		celebrating=true;victory_time=0
+		if not in_menu: game_audio.play_cue("win")
 		last_result=sim.winner+(" wins" if sim.mode=="versus" and sim.winner!="Draw" else "")
 		result_banner_time=2.0
 		if sim.mode=="survival":best_wave=maxi(best_wave,sim.wave);save_settings()
@@ -234,7 +238,11 @@ func _physics_process(dt:float)->void:
 		if victory_time>=2.0 and not preparing:new_round(true)
 	var inputs:Array=[]
 	for p in sim.frogs:inputs.append({} if in_menu else (sim.bot(p) if p.bot else controls(p)))
+	if not world.fx_ready:
+		sim.update_aim(inputs);return
 	sim.step(dt,inputs)
+	if running and not in_menu:
+		for cue in sim.events: game_audio.play_cue(cue)
 
 func controls(p:Dictionary)->Dictionary:
 	if bridge.launched_by_daemon:
@@ -278,6 +286,8 @@ func key(code:int)->bool:return Input.is_physical_key_pressed(code)
 func deadzone(value:float)->float:return signf(value)*maxf(0,(absf(value)-.17)/.83)
 
 func _process(dt:float)->void:
+	game_audio.set_active(running and not in_menu, paused_local)
+	process_managed_menu()
 	if not paused_local and (running or in_menu):prepare_next_round()
 	process_back(dt)
 	if sim!=null and (running or in_menu) and not paused_local:world.update()
@@ -311,6 +321,43 @@ func process_back(_dt:float)->void:
 	elif back_release>=1:
 		back_release=0
 		if running:bridge.request_overlay()
+
+## Managed controllers arrive through the host, not native joypad events.
+func process_managed_menu()->void:
+	if not bridge.launched_by_daemon:return
+	if not running or bridge.phase!="running":
+		managed_menu_buttons=0xffffffff
+		return
+	var buttons:=0
+	var direction:=Vector2i.ZERO
+	for seat in roster:
+		if seat.get("bot",false):continue
+		var frame:Dictionary=bridge.frame(seat.get("controller",""))
+		buttons|=int(frame.get("buttons",0))
+		if direction==Vector2i.ZERO:
+			var x:=Bridge.axis(frame,0);var y:=Bridge.axis(frame,1)
+			direction=Vector2i(int(absf(x)>.5)*int(signf(x)),int(absf(y)>.5)*int(signf(y)))
+			if Bridge.pressed(frame,12):direction.y=-1
+			elif Bridge.pressed(frame,13):direction.y=1
+	var pressed:=buttons & ~managed_menu_buttons
+	managed_menu_buttons=buttons
+	if pressed & 128:
+		toggle_menu()
+		return
+	if not in_menu:return
+	if pressed & 1:hud.activate_row(hud.menu_row)
+	if direction!=hud.held_direction:
+		hud.held_direction=direction;hud.repeat_delay=.36
+		if direction!=Vector2i.ZERO:hud.menu_move(direction)
+
+func managed_menu_action(row:int)->void:
+	if not running or bridge.phase!="running":return
+	match row:
+		0:resume_local()
+		1:
+			resume_local();new_round()
+		2:
+			resume_local();bridge.request_overlay()
 
 func _input(event:InputEvent)->void:
 	if bridge.launched_by_daemon:return
@@ -353,17 +400,27 @@ func prepare(session:String,seats:Array,players:Array)->void:
 		if used_tokens.has(token) and not token.is_empty():token=""
 		used_tokens[token]=true
 		roster.append({"slot":slot,"id":id,"name":profile.get("name","Frog %d"%(slot+1)),"color":profile.get("color",Simulation.COLORS[slot%4]),"skin_color":profile.get("skin_color","#eac794"),"avatar":profile.get("avatar",{}),"bot":occupant.get("kind")=="ai","controller":token})
+	# Host seats stay authoritative; a solo versus match still needs an opponent.
+	if selected_mode=="versus" and roster.size()==1 and not roster[0].bot:
+		var slot:int=(int(roster[0].slot)+1)%4
+		roster.append({"slot":slot,"id":"frog-fighter-solo-bot","name":"Pond Bot","color":Simulation.COLORS[slot],"skin_color":"#eac794","avatar":{},"bot":true,"controller":""})
+	paused_local=false;managed_menu_buttons=0xffffffff
 	new_round()
-	# A minimized, warming window never draws, so frame_post_draw would never fire.
 	if not headless and DisplayServer.window_get_mode()!=DisplayServer.WINDOW_MODE_MINIMIZED:await RenderingServer.frame_post_draw
 	else:await get_tree().process_frame
 	bridge.ready_for_session(session)
 
 func start_managed(_session:String)->void:
-	running=true;back_release=0
+	running=true;back_release=0;managed_menu_buttons=0xffffffff
+	# A minimized/offscreen preload can have an unrendered cached backdrop.
+	if is_instance_valid(world):
+		for node in world.find_children("*","Node3D",true,false):
+			if node.has_method("fit_camera") and node.has_method("refresh"):node.refresh()
 
 func pause_managed(_session:String)->void:
+	paused_local=false;in_menu=false;hud.hide_menu();managed_menu_buttons=0xffffffff
 	running=false
+
 
 func dispose_managed(_session:String)->void:
 	discard_prepared();celebrating=false;victory_time=0

@@ -104,3 +104,36 @@ character meshes, hit blinks, and persistent visual ownership/cleanup.
 `tests/arsenal.gd`: 24 checks passed; `tests/run.gd`: 41 checks passed, including
 long survival simulations. Native roster and fifth-wave screenshots were inspected.
 The game was launched from source with Survival selected.
+
+## Managed play and combat iteration — 2026-10-11
+
+Reviewed and retained the existing short audio cue bank, compact arenas, fire
+balance, drop-through platforms and forgiving tongue targeting. The audio bank
+contains 50 licensed/procedural variations and uses a bounded ten-voice pool.
+
+A solo managed versus roster now receives one local AI opponent; survival and
+explicit host AI seats retain their own rules. Host Start opens a three-action
+pause menu after a neutral input frame. Background caching waits for visible
+rendered frames, excludes minimized/offscreen windows and refreshes on activation.
+The current GameNight SDK and Screen lifecycle from main remain authoritative.
+
+Godot 4.5.2 checks passed for settings, simulation (42 checks), combat, forest,
+menu, movement/AI (33 checks), arsenal, pickup, survival, arenas, drop-through,
+terrain, expansion, physical scenery (50 checks), tongue targeting, tongue
+physics, burr, destruction, transitions, fire balance, compact maps, audio bank
+and managed play. The simulation ran on native Windows; the other checks ran
+headlessly in WSL. The isolated host integration test also passed after merging
+the latest SDK, including session/input guards, pause, resume and disconnect.
+Stale menu/audio and tongue-animation assertions were updated to the intended
+behavior. The loose-body tongue check now isolates its target from neighboring
+bodies; separate targeting tests cover nearest edges and occlusion.
+
+A separate Godot 4.6.2 Windows PCK passed a native headless probe: two frogs,
+one AI, Start menu available, background asset present, and tests/build files
+excluded. The live installed override was left untouched. Prior installed-pack
+probe reproduced one frog, zero AI and no Start menu. No live controller/audio
+or Windows GPU validation was performed during the ongoing playtest.
+
+Godot 4.6.2 with an isolated Xvfb/Openbox display passed the hidden-background
+regression and produced a visually inspected garden screenshot. The window
+manager is required because the project now boots minimized.

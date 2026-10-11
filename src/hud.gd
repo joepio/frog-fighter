@@ -33,6 +33,11 @@ func _draw()->void:
 	if game==null or game.sim==null:return
 	var s:RefCounted=game.sim
 	if game.in_menu:
+		if game.bridge.launched_by_daemon:
+			panel(Rect2(540,275,520,410),Color(.045,.09,.065,.96),22)
+			centered("Paused",Vector2(800,340),38,CREAM,serif)
+			centered("Start to resume",Vector2(800,642),17,MUTED)
+			return
 		panel(Rect2(70,95,500,710),Color(.045,.09,.065,.96),22)
 		text("Frog Fighter",Vector2(106,168),43,CREAM,serif)
 		text("Paused" if game.paused_local else "Make yourself at home.",Vector2(109,204),17,MUTED)
@@ -77,6 +82,9 @@ func row_enabled(row:int)->bool:
 	return row!=2 or (game.selected_mode=="versus" and game.human_count<4)
 
 func menu_move(direction:Vector2i)->void:
+	if game.bridge.launched_by_daemon:
+		if direction.y!=0:menu_row=posmod(menu_row+direction.y,3);make_menu()
+		return
 	if direction.y!=0:
 		var count:int=8 if game.paused_local else 7
 		menu_row=posmod(menu_row+direction.y,count)
@@ -100,6 +108,9 @@ func cycle_value(direction:int)->void:
 		5:game.set_fullscreen(not game.fullscreen)
 
 func activate_row(row:int)->void:
+	if game.bridge.launched_by_daemon:
+		game.managed_menu_action(row)
+		return
 	menu_row=row
 	if row<6:cycle_value(1)
 	elif row==6 and game.paused_local:game.resume_local()
@@ -147,6 +158,19 @@ func _process(dt:float)->void:
 func make_menu()->void:
 	if is_instance_valid(menu):remove_child(menu);menu.queue_free()
 	menu=Control.new();menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);menu.mouse_filter=Control.MOUSE_FILTER_IGNORE;add_child(menu)
+	if game.bridge.launched_by_daemon:
+		menu_row=clampi(menu_row,0,2)
+		for row in 3:
+			var button:=Button.new();button.position=Vector2(580,375+row*72);button.size=Vector2(440,58)
+			button.text=["Resume","New round","Back to Game Room"][row]
+			button.focus_mode=Control.FOCUS_NONE
+			button.add_theme_font_override("font",bold);button.add_theme_font_size_override("font_size",24)
+			var style:=StyleBoxFlat.new();style.bg_color=Color("d5ee8e") if row==menu_row else Color("23372b");style.set_corner_radius_all(9)
+			button.add_theme_stylebox_override("normal",style)
+			button.add_theme_color_override("font_color",Color("20311c") if row==menu_row else CREAM)
+			button.pressed.connect(func():game.managed_menu_action(row));menu.add_child(button)
+		queue_redraw()
+		return
 	menu_row=clampi(menu_row,0,7 if game.paused_local else 6)
 	if not row_enabled(menu_row):menu_row=3
 	var labels:Array=["Mode","Players","Bots","Lives","Level","Display","Resume" if game.paused_local else "Play"]

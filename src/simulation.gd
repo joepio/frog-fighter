@@ -16,6 +16,10 @@ const RADIUS:=0.53*FROG_SCALE
 const WALL_LIMIT:=13.98-RADIUS
 const WALL_CONTACT:=WALL_LIMIT-.10
 const RUN_SPEED:=12.0
+const TONGUE_REACH:=12.0
+const TONGUE_MISS_DURATION:=.32
+const BURN_DURATION:=1.6
+const BURN_DPS:=12.0
 const WEAPON_ORDER=["acorn","seed","bramble","flame","rail","grenade","burr"]
 const WEAPON_SCALE:=1.65
 const JUMP_SPEED:=22.0
@@ -53,7 +57,7 @@ const WEAPON_NAMES={"acorn":"Acorn Cannon","seed":"Pine Repeater","bramble":"Bra
 const WEAPONS={
  "acorn":{"interval":.58,"speed":23.0,"damage":24.0,"impulse":11.0,"recoil":2.3,"stop":.055},
  "seed":{"interval":.12,"speed":34.0,"damage":9.0,"impulse":3.4,"recoil":.6,"stop":.018},
- "flame":{"interval":.075,"speed":18.0,"damage":3.5,"impulse":.65,"recoil":.12,"stop":0.0},
+ "flame":{"interval":.075,"speed":18.0,"damage":7.5,"impulse":.65,"recoil":.12,"stop":0.0},
  "rail":{"interval":1.6,"speed":180.0,"damage":100.0,"impulse":19.0,"recoil":7.0,"stop":.075},
  "burr":{"interval":1.15,"speed":15.0,"damage":145.0,"impulse":22.0,"recoil":0.0,"stop":.085},
  "grenade":{"interval":.9,"speed":13.0,"damage":80.0,"impulse":14.0,"recoil":3.4,"stop":.06},
@@ -122,6 +126,7 @@ func _init(roster: Array = [], game_mode: String = "versus", seed_value: int = 1
 		for item in stack.pieces:
 			var piece:=platform(Vector2(stack.x+item[0],stack.y+item[1]),item[2],"loose")
 			piece["material"]=stack.material
+			piece["crate"]=item.size()>4 and item[4]
 			Physics.prepare(piece,2.3 if stack.material=="wood" else 3.5,item[3])
 			platforms.append(piece)
 	# Shelf fungi belong to the tree landmark and are genuine footholds/anchors.
@@ -138,9 +143,9 @@ func _init(roster: Array = [], game_mode: String = "versus", seed_value: int = 1
 		var p: Dictionary = roster[i].duplicate(true)
 		p.merge({"pos":spawns[i%4],"spawn":spawns[i%4],"vel":Vector2.ZERO,"aim":Vector2.RIGHT,
 			"hp":100.0,"lives":3,"alive":true,"respawn":0.0,"invincible":2.0,
-			"ground":-1,"in_water":false,"coyote":0.0,"wall_release":0.0,"wall_air":0.0,"jump_buffer":0.0,"jump_prev":false,"tongue_prev":false,
+			"ground":-1,"in_water":false,"drop_platform":-1,"drop_time":0.0,"coyote":0.0,"wall_release":0.0,"wall_air":0.0,"jump_buffer":0.0,"jump_prev":false,"tongue_prev":false,
 			"throw_prev":false,"pending_burr":{},"pickup_delay":0.0,"enemy_guard":0.0,"anchor":{},"rope":0.0,"weapon":"","ammo":0,
-			"tongue_active":false,"trigger_held":false,"stride":0.0,"walk":0.0,"wounds":[],"burn":0.0,"shot_age":10.0,"last_weapon":"","last_volley":-1,"hit_dir":Vector2.RIGHT,"cooldown":0.0,"stuck":false,"facing":1.0,"flash":0.0,
+			"tongue_active":false,"tongue_miss":0.0,"tongue_direction":Vector2.RIGHT,"trigger_held":false,"stride":0.0,"walk":0.0,"wounds":[],"burn":0.0,"shot_age":10.0,"last_weapon":"","last_volley":-1,"hit_dir":Vector2.RIGHT,"cooldown":0.0,"stuck":false,"facing":1.0,"flash":0.0,
 			"name":"Frog %d"%(i+1),"color":COLORS[i%4],"slot":i,"bot":false},false)
 		frogs.append(p)
 	for pos in layout.crates: crates.append({"pos":pos,"vel":Vector2.ZERO,"angle":0.0})
@@ -298,6 +303,7 @@ func step(dt:float,inputs:Array)->void:
 		else:
 			var shelf:Dictionary=platforms[rng.randi_range(0,mini(arena_platform_count-1,platforms.size()-1))]
 			if usable(shelf):add_pickup(shelf.pos+Vector2(rng.randf_range(-.3,.3)*shelf.width,1),WEAPON_ORDER[rng.randi_range(0,WEAPON_ORDER.size()-1)])
+	update_burning(dt)
 	update_shots(dt)
 	if mode=="survival" and not over: update_survival(dt)
 	update_debris(dt)
@@ -313,8 +319,8 @@ func update_frog(p:Dictionary,c:Dictionary,dt:float)->void:
 	if p.respawn>0:
 		p.respawn-=dt
 		if p.respawn<=0:
-			p.pos=p.spawn;p.vel=Vector2.ZERO;p.hp=100.0;p.invincible=2.0;p.last_volley=-1;p.flash=0.0;p.burn=0.0;p.wounds.clear()
-			p.stuck=false;p.in_water=false;p.ground=-1;p.wall_release=0.0;p.wall_air=0.0
+			p.pos=p.spawn;p.vel=Vector2.ZERO;p.hp=100.0;p.invincible=2.0;p.last_volley=-1;p.flash=0.0;p.burn=0.0;p.tongue_miss=0.0;p.wounds.clear()
+			p.stuck=false;p.in_water=false;p.ground=-1;p.wall_release=0.0;p.wall_air=0.0;p.drop_platform=-1;p.drop_time=0.0
 		return
 	if not p.pending_burr.is_empty():
 		p.pending_burr.delay-=dt
@@ -323,12 +329,23 @@ func update_frog(p:Dictionary,c:Dictionary,dt:float)->void:
 	p.cooldown=maxf(0,p.cooldown-dt);p.pickup_delay=maxf(0,p.pickup_delay-dt);p.enemy_guard=maxf(0,p.enemy_guard-dt)
 	if p.ground>=0 and not usable(platforms[p.ground]):p.ground=-1
 	if not p.anchor.is_empty() and p.anchor.platform>=0 and not usable(platforms[p.anchor.platform]):p.anchor={}
+	p.drop_time=maxf(0,p.drop_time-dt)
+	if p.drop_platform>=0:
+		var shelf:Dictionary=platforms[p.drop_platform]
+		var relative:Vector2=(p.pos-shelf.pos).rotated(-shelf.angle)
+		if p.drop_time<=0 or relative.y< -RADIUS-.25 or absf(relative.x)>shelf.width*.5+RADIUS+.1:p.drop_platform=-1
 	var move:Vector2=c.get("move",Vector2.ZERO)
 	var jump:bool=c.get("jump",false)
 	var tongue:bool=c.get("tongue",false)
 	p.tongue_active=tongue;p.trigger_held=c.get("fire",false)
 	if jump and not p.jump_prev: p.jump_buffer=.14
 	else: p.jump_buffer=maxf(0,p.jump_buffer-dt)
+	if jump and not p.jump_prev and move.y< -.55 and p.ground>=0 and can_drop(platforms[p.ground]):
+		var support:Dictionary=platforms[p.ground]
+		p.drop_platform=p.ground;p.drop_time=.45
+		p.pos-=Vector2(-sin(support.angle),cos(support.angle))*.12
+		p.vel.y=minf(p.vel.y,support.vel.y-6.0)
+		p.ground=-1;p.coyote=0.0;p.jump_buffer=0.0;p.anchor={};p.stuck=false;p.wall_release=.18
 	if p.ground>=0: p.coyote=.12
 	else: p.coyote=maxf(0,p.coyote-dt)
 	var was_stuck:bool=p.stuck
@@ -342,7 +359,7 @@ func update_frog(p:Dictionary,c:Dictionary,dt:float)->void:
 		p.stuck=p.wall_release<=0 and not leaving_wall and p.vel.dot(grip_normal)<1.0
 	elif c.get("grip",false):
 		for shelf in platforms:
-			if not usable(shelf):continue
+			if not usable(shelf) or platforms.find(shelf)==p.drop_platform:continue
 			if shelf.kind=="water":continue
 			var relative:Vector2=(p.pos-shelf.pos).rotated(-shelf.angle)
 			if absf(relative.x)<shelf.width*.5+.15 and absf(relative.y)<RADIUS+.35:
@@ -372,6 +389,8 @@ func update_frog(p:Dictionary,c:Dictionary,dt:float)->void:
 	if not jump and p.jump_prev and p.vel.y>5: p.vel.y*=.48
 	if tongue and not p.tongue_prev:
 		p.anchor=cast_tongue(p.pos,p.aim)
+		p.tongue_direction=p.aim
+		p.tongue_miss=TONGUE_MISS_DURATION if p.anchor.is_empty() else 0.0
 		if not p.anchor.is_empty():
 			p.rope=p.pos.distance_to(anchor_point(p.anchor));events.append("tongue")
 	if not tongue: p.anchor={}
@@ -390,7 +409,10 @@ func update_frog(p:Dictionary,c:Dictionary,dt:float)->void:
 				var support:Dictionary=platforms[p.anchor.platform]
 				if Physics.dynamic(support):
 					for rope in support.ropes:Physics.solve_rope(support,rope,dt)
+	var was_grounded:bool=p.ground>=0
+	var landing_speed:float=-p.vel.y
 	p.ground=land(p,RADIUS,dt)
+	if not was_grounded and p.ground>=0 and landing_speed>3.0: events.append("land")
 	p.in_water=p.ground>=0 and platforms[p.ground].kind=="water"
 	var walking:float=clampf(absf(p.vel.x)/5.5,0,1) if p.ground>=0 and not p.stuck and not p.in_water else 0.0
 	p.walk=move_toward(p.walk,walking,dt*12)
@@ -431,11 +453,15 @@ func solve_tongue(p:Dictionary,reel_speed:float=0.0)->void:
 		support.pos+=normal*correction*inverse_mass
 		support.angle+=arm.cross(normal)*correction*inverse_inertia
 
+func can_drop(shelf:Dictionary)->bool:
+	# Natural ground and solid physics props remain solid. Thin shelves are one-way.
+	return shelf.kind not in ["water","rock","loose","barricade","pier"]
+
 func land(body:Dictionary,radius:float,dt:float)->int:
 	var grounded:=-1
 	for i in range(platforms.size()):
 		var s:Dictionary=platforms[i]
-		if not usable(s):continue
+		if not usable(s) or i==body.get("drop_platform",-1):continue
 		if s.kind in ["loose","barricade","pier"]:
 			var contact:Dictionary=Physics.circle(s,body.pos,radius)
 			if contact.is_empty():continue
@@ -486,43 +512,52 @@ func shelf_hit(shelf:Dictionary,a:Vector2,b:Vector2)->Dictionary:
 	var contact:Variant=Geometry2D.segment_intersects_segment(a,b,start,end)
 	return {} if contact==null else {"point":contact,"normal":Vector2(0,1).rotated(shelf.angle)}
 
+func tongue_candidate(origin:Vector2,direction:Vector2,point:Vector2,index:int,candidates:Array)->void:
+	var delta:Vector2=point-origin;var distance:float=delta.length()
+	if distance<=.6 or distance>TONGUE_REACH:return
+	var alignment:float=delta.dot(direction)/distance
+	if alignment<.5:return # Generous forward cone; never snap behind the player.
+	candidates.append({"point":point,"platform":index,"score":distance*(1+2*(1-alignment))})
+
+func tongue_edge(origin:Vector2,direction:Vector2,a:Vector2,b:Vector2,index:int,candidates:Array)->void:
+	# Query the actual edge, not a thin ray. Corners and nearby surfaces remain
+	# selectable when the stick points slightly past the geometry.
+	for point in [Geometry2D.get_closest_point_to_segment(origin,a,b),Geometry2D.get_closest_point_to_segment(origin+direction*TONGUE_REACH,a,b),a,b]:
+		tongue_candidate(origin,direction,point,index,candidates)
+
 func cast_tongue(origin:Vector2,direction:Vector2)->Dictionary:
-	var end:Vector2=origin+direction.normalized()*12
-	var nearest:=12.1
-	var hit:Dictionary={}
-	for i in range(platforms.size()+3):
-		var a:Vector2;var b:Vector2
-		if i<platforms.size():
-			var s:Dictionary=platforms[i]
-			if s.kind=="water" or not usable(s):continue
-			if s.get("inv_mass",0)>0 or s.get("max_hp",0)>0:
-				var contact:Dictionary=shelf_hit(s,origin,end)
-				if not contact.is_empty():
-					var distance:float=origin.distance_to(contact.point)
-					if distance<nearest and distance>.6:
-						nearest=distance;hit={"platform":i,"offset":(contact.point-s.pos).rotated(-s.angle)}
-				continue
-			a=s.pos+Vector2(-s.width*.5,.2).rotated(s.angle)
-			b=s.pos+Vector2(s.width*.5,.2).rotated(s.angle)
-		elif i==platforms.size():
-			if not roof:continue
-			a=Vector2(-half_width,ceiling-.2);b=Vector2(half_width,ceiling-.2)
-		elif i==platforms.size()+1:
-			if not walls:continue
-			a=Vector2(-half_width,0);b=Vector2(-half_width,ceiling)
+	direction=direction.normalized()
+	if direction.length_squared()<.5:return {}
+	var candidates:Array=[]
+	for i in range(platforms.size()):
+		var shelf:Dictionary=platforms[i]
+		if shelf.kind=="water" or not usable(shelf):continue
+		if shelf.get("inv_mass",0)>0 or shelf.get("max_hp",0)>0:
+			var half:Vector2=Physics.half(shelf)
+			var corners:Array=[Vector2(-half.x,-half.y),Vector2(half.x,-half.y),half,Vector2(-half.x,half.y)]
+			for j in range(4):tongue_edge(origin,direction,shelf.pos+corners[j].rotated(shelf.angle),shelf.pos+corners[(j+1)%4].rotated(shelf.angle),i,candidates)
 		else:
-			if not walls:continue
-			a=Vector2(half_width,0);b=Vector2(half_width,ceiling)
-		var point:Variant=Geometry2D.segment_intersects_segment(origin,end,a,b)
-		if point!=null and origin.distance_to(point)<nearest and origin.distance_to(point)>.6:
-			nearest=origin.distance_to(point)
-			hit={"platform":i if i<platforms.size() else -1,"offset":(point-platforms[i].pos).rotated(-platforms[i].angle) if i<platforms.size() else point}
-	for hook in hooks:
-		var entry:float=flame_circle_entry(origin,end,hook,.30)
-		if entry<INF and origin.distance_to(hook)<nearest and origin.distance_to(hook)>.6:
-			nearest=origin.distance_to(hook);hit={"platform":-1,"offset":hook}
-	if not hit.is_empty() and hit.platform>=0:stress_structure(platforms[hit.platform],.01)
-	return hit
+			tongue_edge(origin,direction,shelf.pos+Vector2(-shelf.width*.5,.2).rotated(shelf.angle),shelf.pos+Vector2(shelf.width*.5,.2).rotated(shelf.angle),i,candidates)
+	if roof:tongue_edge(origin,direction,Vector2(-half_width,ceiling-.2),Vector2(half_width,ceiling-.2),-1,candidates)
+	if walls:
+		for side in [-1,1]:tongue_edge(origin,direction,Vector2(side*half_width,0),Vector2(side*half_width,ceiling),-1,candidates)
+	for hook in hooks:tongue_candidate(origin,direction,hook,-1,candidates)
+	candidates.sort_custom(func(a,b):return a.score<b.score)
+	for candidate in candidates:
+		var blocked:=false
+		# Line-of-sight only rejects occluded edges; it does not choose the anchor.
+		for shelf in platforms:
+			if shelf.kind=="water" or not usable(shelf):continue
+			var contact:Dictionary=shelf_hit(shelf,origin,candidate.point)
+			if not contact.is_empty() and origin.distance_to(contact.point)>.08 and origin.distance_to(contact.point)<origin.distance_to(candidate.point)-.08:
+				blocked=true;break
+		if blocked:continue
+		var index:int=candidate.platform
+		if index>=0:
+			stress_structure(platforms[index],.01)
+			return {"platform":index,"offset":(candidate.point-platforms[index].pos).rotated(-platforms[index].angle)}
+		return {"platform":-1,"offset":candidate.point}
+	return {}
 
 func anchor_point(anchor:Dictionary)->Vector2:
 	if anchor.platform<0:return anchor.offset
@@ -558,7 +593,7 @@ func fire(p:Dictionary)->void:
 	for i in range(0 if kind=="rail" else count):
 		var aim:Vector2=p.aim.rotated((i-2)*.10 if count>1 else 0)
 		shots.append({"pos":p.pos+aim*.7*FROG_SCALE,"vel":aim*spec.speed+p.vel*.25+(Vector2(0,4) if kind=="grenade" else Vector2.ZERO),
-			"owner":p.slot,"kind":kind,"volley":volley_id,"life":.28 if kind=="flame" else (1.65 if kind=="grenade" else (.62 if kind=="bramble" else 1.5))})
+			"origin":p.pos+aim*.7*FROG_SCALE,"owner":p.slot,"kind":kind,"volley":volley_id,"life":.28 if kind=="flame" else (1.65 if kind=="grenade" else (.62 if kind=="bramble" else 1.5))})
 	p.vel-=p.aim*spec.recoil
 	if p.ground>=0:Physics.impulse(platforms[p.ground],-p.aim*spec.recoil*.8,p.pos-Vector2(0,RADIUS))
 	p.cooldown=spec.interval;p.ammo-=1;p.shot_age=0.0;p.last_weapon=kind
@@ -769,6 +804,24 @@ func flame_contact(p:Dictionary,maximum:float,from:Vector2=Vector2.INF)->Diction
 		previous=point
 	return {"distance":maximum,"blocked":false,"point":previous}
 
+func flame_damage(distance:float)->float:
+	# Full heat near the nozzle; the thin end of the plume is weaker.
+	return WEAPONS.flame.damage*lerpf(1.0,.4,smoothstep(1.5,4.5,distance))
+
+func update_burning(dt:float)->void:
+	for p in frogs:
+		if not p.alive or p.respawn>0 or p.in_water:p.burn=0.0;continue
+		var burning_time:float=minf(dt,p.burn)
+		p.burn=maxf(0,p.burn-dt)
+		if burning_time<=0 or over:continue
+		# Sustained heat does not add knockback, hit pauses, or refresh its own timer.
+		p.hp-=BURN_DPS*burning_time*damage
+		if p.hp<=0:knockout(p)
+	for enemy in enemies:
+		var burning_time:float=minf(dt,enemy.get("burn",0.0))
+		enemy["burn"]=maxf(0,enemy.get("burn",0.0)-dt)
+		if burning_time>0 and enemy.hp>0 and not over:hurt_enemy(enemy,BURN_DPS*burning_time,Vector2.ZERO,"burn")
+
 func update_shots(dt:float)->void:
 	for shot in shots:
 		if shot.kind=="burr":
@@ -805,15 +858,16 @@ func update_shots(dt:float)->void:
 				nearest=previous.distance_squared_to(contact.point);target=shelf;target_kind="shelf";point=contact.point
 		if not target_kind.is_empty():
 			var spec:Dictionary=WEAPONS[shot.kind];var direction:Vector2=shot.vel.normalized()
+			var hit_damage:float=flame_damage(shot.get("origin",previous).distance_to(point)) if shot.kind=="flame" else spec.damage
 			if shot.kind=="flame":
 				for effect in fx:
 					if effect.kind in ["flame","flame_smoke"] and effect.get("volley",-1)==shot.get("volley",-2):
 						effect.reach=maxf(.08,(point-effect.pos).dot(effect.dir))
 			shot.life=0
 			match target_kind:
-				"frog":hurt(target,spec.damage,direction*spec.impulse,shot.kind,shot.get("volley",-1),point)
+				"frog":hurt(target,hit_damage,direction*spec.impulse,shot.kind,shot.get("volley",-1),point)
 				"bug":
-					hurt_enemy(target,spec.damage,direction*(spec.impulse*.35),shot.kind)
+					hurt_enemy(target,hit_damage,direction*(spec.impulse*.35),shot.kind)
 				"wood","shelf":
 					if target_kind=="wood":target.vel+=shot.vel*.45
 					elif Physics.dynamic(target):Physics.impulse(target,direction*spec.impulse*1.25,point)
@@ -832,7 +886,7 @@ func hurt(p:Dictionary,damage:float,impulse:Vector2,kind:String="contact",volley
 	var continuation:bool=volley>0 and p.last_volley==volley
 	var gentle:bool=kind=="flame"
 	if not p.alive or p.respawn>0 or (p.invincible>0 and not continuation):return
-	if gentle:p.burn=1.25
+	if gentle and not p.in_water:p.burn=BURN_DURATION
 	p.hp-=damage*self.damage;p.vel+=impulse*(1+(100-p.hp)/75)*(.28 if continuation else 1.0)
 	if not continuation and not gentle:p.vel.y+=3
 	p.anchor={};p.invincible=.065;p.last_volley=volley;p.hit_dir=impulse.normalized()
@@ -872,7 +926,7 @@ func knockout(p:Dictionary)->void:
 	add_fx("mist_ko",pos,p.hit_dir,.85,"acorn")
 	hitstop=maxf(hitstop,.095);stop_guard=.18
 	trauma=1.0;events.append("splat")
-	p.lives-=1;p.anchor={};p.weapon="";p.ammo=0;p.burn=0.0;p.pending_burr={}
+	p.lives-=1;p.anchor={};p.weapon="";p.ammo=0;p.burn=0.0;p.tongue_miss=0.0;p.pending_burr={}
 	if p.lives<=0:p.alive=false
 	else:p.respawn=1.5
 
@@ -882,12 +936,13 @@ func impact_stop(seconds:float)->void:
 	hitstop=maxf(hitstop,seconds);stop_guard=.10
 
 func add_fx(kind:String,pos:Vector2,direction:Vector2,life:float,weapon:String)->void:
+	if kind in ["wood","explosion","impact_blast"]: events.append("explosion" if kind=="impact_blast" else kind)
 	fx.append({"kind":kind,"pos":pos,"dir":direction,"life":life,"age":0.0,"weapon":weapon})
 	while fx.size()>64:fx.pop_front()
 
 func update_feedback(dt:float)->void:
 	fx_clock+=dt;stop_guard=maxf(0,stop_guard-dt);trauma=maxf(0,trauma-dt*2.8)
-	for p in frogs:p.shot_age+=dt;p.flash=maxf(0,p.flash-dt);p.burn=maxf(0,p.burn-dt)
+	for p in frogs:p.shot_age+=dt;p.flash=maxf(0,p.flash-dt);p.tongue_miss=maxf(0,p.tongue_miss-dt)
 	for effect in fx:effect.age+=dt
 	fx=fx.filter(func(effect):return effect.age<effect.life)
 	for spray in delayed_gore:
@@ -963,11 +1018,13 @@ func spawn_wave()->void:
 
 func hurt_enemy(enemy:Dictionary,damage:float,impulse:Vector2,weapon:String)->void:
 	if enemy.hp<=0:return
-	enemy.hp-=damage*self.damage;enemy["flash"]=.14
+	enemy.hp-=damage*self.damage
+	if weapon=="flame":enemy["burn"]=BURN_DURATION
+	if weapon!="burn":enemy["flash"]=.14
 	enemy["vel"]=enemy.get("vel",Vector2.ZERO)+impulse*(.2 if enemy.get("kind","")=="boss" else 1.0)
 	var color:=Color(ENEMY_STATS.get(enemy.get("kind","bee"),ENEMY_STATS.bee).color)
-	burst(enemy.pos,color,2 if weapon=="flame" else 5)
-	if weapon!="flame":add_fx("hit",enemy.pos,impulse.normalized(),.16,weapon);impact_stop(.012)
+	if weapon!="burn":burst(enemy.pos,color,2 if weapon=="flame" else 5)
+	if weapon not in ["flame","burn"]:add_fx("hit",enemy.pos,impulse.normalized(),.16,weapon);impact_stop(.012)
 	if enemy.hp<=0:
 		burst(enemy.pos,color,24 if enemy.get("kind","")=="boss" else 12)
 		if enemy.get("kind","")=="boss":
@@ -1073,10 +1130,10 @@ func bot(p:Dictionary)->Dictionary:
 		if next>=0 and next!=source:
 			var shelf:Dictionary=platforms[next]
 			var landing_x:float=clampf(p.pos.x,shelf.pos.x-shelf.width*.5+.5,shelf.pos.x+shelf.width*.5-.5)
-			var elevation:float=shelf.pos.y-(platforms[source].pos.y if source>=0 else p.pos.y-RADIUS-.2)
+			var elevation:float=bot_top(shelf).y-(bot_top(platforms[source]).y if source>=0 else p.pos.y-RADIUS-.2)
 			move.x=signf(landing_x-p.pos.x) if absf(landing_x-p.pos.x)>.2 else 0
 			if elevation>2.8:
-				aim=(Vector2(landing_x,shelf.pos.y+.2)-p.pos).normalized()
+				aim=(Vector2(landing_x,bot_top(shelf).y+.2)-p.pos).normalized()
 				tongue=not p.tongue_prev;move.y=1;can_fire=false
 			elif p.ground>=0:
 				var current:Dictionary=platforms[source]
@@ -1088,6 +1145,10 @@ func bot(p:Dictionary)->Dictionary:
 				else:
 					jump=not p.jump_prev and (absf(edge-p.pos.x)<1.0 or absf(landing_x-p.pos.x)<1.2)
 					if not jump:move.x=direction
+	# Assisted grapples can land bots beside cover on the same perch. Hop over
+	# that obstruction instead of waiting forever for a clear firing line.
+	if armed and not can_fire and distance<range_limit and p.ground>=0 and bot_platform(target)==p.ground:
+		jump=not p.jump_prev;move.x=signf(delta.x)
 	if p.ground>=0 and platforms[p.ground].kind=="crumble" and platforms[p.ground].stress>.35:
 		jump=not p.jump_prev
 	if p.pos.y<2 and p.vel.y<0 and p.anchor.is_empty():
@@ -1104,15 +1165,18 @@ func bot(p:Dictionary)->Dictionary:
 	return {"move":move,"aim":aim,"jump":jump,"tongue":tongue,"fire":firing}
 
 func bot_surface(shelf:Dictionary)->bool:
-	return usable(shelf) and not shelf.get("falling",false) and not shelf.get("structural_fall",false) and not shelf.get("rubble",false) and shelf.kind not in ["pier","barricade"]
+	return usable(shelf) and not shelf.get("falling",false) and not shelf.get("structural_fall",false) and not shelf.get("rubble",false) and (shelf.get("walkable",false) or shelf.kind not in ["pier","barricade"])
+
+func bot_top(shelf:Dictionary)->Vector2:
+	return shelf.pos+Vector2(0,shelf.get("height",.4)*.5-.2).rotated(shelf.angle)
 
 func bot_platform(pos:Vector2)->int:
 	var result:=-1;var best:=INF
 	for i in range(platforms.size()):
 		var shelf:Dictionary=platforms[i]
 		if not bot_surface(shelf):continue
-		if shelf.pos.y>pos.y+.2:continue
-		var score:float=absf(pos.y-shelf.pos.y-RADIUS-.2)+maxf(0,absf(pos.x-shelf.pos.x)-shelf.width*.5)*3
+		if bot_top(shelf).y>pos.y+.2:continue
+		var score:float=absf(pos.y-bot_top(shelf).y-RADIUS-.2)+maxf(0,absf(pos.x-shelf.pos.x)-shelf.width*.5)*3
 		if score<best:best=score;result=i
 	return result
 
@@ -1131,11 +1195,11 @@ func bot_route(source:int,destination:int)->int:
 		for next in range(platforms.size()):
 			if next==current or not bot_surface(platforms[next]):continue
 			var a:Dictionary=platforms[current];var b:Dictionary=platforms[next]
-			var rise:float=b.pos.y-a.pos.y
+			var rise:float=bot_top(b).y-bot_top(a).y
 			var gap:float=maxf(0,absf(b.pos.x-a.pos.x)-(a.width+b.width)*.5)
 			var grapple:bool=rise>2.8
-			if rise< -9 or rise>9 or (grapple and a.pos.distance_to(b.pos)>11) or (not grapple and gap>4):continue
-			var cost:float=costs[current]+a.pos.distance_to(b.pos)+(4 if grapple else 0)+(3 if b.kind=="crumble" else 0)
+			if rise< -9 or rise>9 or (grapple and bot_top(a).distance_to(bot_top(b))>11) or (not grapple and gap>4):continue
+			var cost:float=costs[current]+bot_top(a).distance_to(bot_top(b))+(4 if grapple else 0)+(3 if b.kind=="crumble" else 0)
 			if cost<costs[next]:costs[next]=cost;previous[next]=current
 	if previous[destination]<0:return -1
 	var next:int=destination
