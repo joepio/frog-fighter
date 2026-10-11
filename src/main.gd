@@ -426,6 +426,8 @@ func toggle_fullscreen()->void:
 
 func prepare(session:String,seats:Array,players:Array)->void:
 	running=false;in_menu=false;hud.hide_menu();roster=[];next_round=1;arena_round=0
+	# Local saved lives must not override the host's shared match setting in UI.
+	round_lives=int(settings.values.lives)
 	var used_tokens:Dictionary={}
 	for seat in seats:
 		var occupant:Dictionary=seat.get("occupant",{})

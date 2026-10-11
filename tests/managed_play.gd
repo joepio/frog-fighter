@@ -38,7 +38,9 @@ func run()->void:
 	game.bridge.launched_by_daemon=true;game.bridge.set_process(false)
 	game.selected_mode="versus"
 	game.selected_arena="terrarium"
+	game.round_lives=5 # A standalone saved preference differs from host defaults.
 	await game.prepare("solo",SOLO,PLAYERS)
+	check(game.round_lives==3 and game.sim.frogs[0].lives==3,"Managed lives selector starts from host value, not standalone saved preference")
 	check(game.roster.size()==2 and game.roster[1].bot,"Solo versus gets an AI opponent")
 	check(game.roster[0].id=="p1" and game.roster[0].controller=="pad","Host player and input identity are preserved")
 	game.bridge.phase="running";game.start_managed("solo")
