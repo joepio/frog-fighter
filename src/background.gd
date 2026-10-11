@@ -57,6 +57,12 @@ func build(world:Node3D)->void:
 	image_plane.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(image_plane)
 	fit_camera()
+	RenderingServer.frame_post_draw.connect(_frame_drawn)
+	get_window().size_changed.connect(refresh)
+
+func refresh()->void:
+	frames=0
+	viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
 
 func build_theme_depth(theme:String)->void:
 	# Near foliage and stones provide actual 3D depth over the distant art plate.
@@ -121,6 +127,19 @@ func fit_camera()->void:
 
 func _process(_dt:float)->void:
 	fit_camera()
+
+func _frame_drawn()->void:
+	# Hidden preloads and next-round staging can tick without drawing anything.
+	# Cache only after real visible frames, never a still-black render target.
+	var window:=get_window()
+	if not window.visible:return
+	var visible_screen:=false
+	var bounds:=Rect2i(window.position,window.size)
+	for screen in DisplayServer.get_screen_count():
+		if bounds.intersects(Rect2i(DisplayServer.screen_get_position(screen),DisplayServer.screen_get_size(screen))):visible_screen=true;break
+	if not visible_screen:return
+	var parent_view:=get_viewport()
+	if parent_view is SubViewport and parent_view.render_target_update_mode==SubViewport.UPDATE_DISABLED:return
 	frames+=1
 	# Let procedural textures settle; the distant world is static, so bake it once.
 	if frames==90:viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED

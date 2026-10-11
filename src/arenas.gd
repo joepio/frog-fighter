@@ -2,12 +2,18 @@ extends RefCounted
 const CLASSIC_IDS=["terrarium","vineway","canopy","floodplain"]
 const EXPANSION_IDS=["reed_delta","sky_ruins","deadfall","grotto"]
 const DESTRUCTION_IDS=["beaver_dam","shatter_spire"]
-const IDS=CLASSIC_IDS+EXPANSION_IDS+DESTRUCTION_IDS
-const NAMES={"terrarium":"Terrarium","vineway":"Vineway","canopy":"Canopy","floodplain":"Floodplain","cycle":"Tour","reed_delta":"Reed Delta","sky_ruins":"Sky Ruins","deadfall":"Deadfall","grotto":"Glow Grotto","beaver_dam":"Beaver Dam","shatter_spire":"Shatter Spire"}
-const DESCRIPTIONS={"terrarium":"Tilting timber and familiar garden perches.","vineway":"Long swings across a wide, open middle.","canopy":"Climb the treetops using a rising platform.","floodplain":"Moving ferries above a wide stretch of water.","cycle":"A different arena after each match.","reed_delta":"Wide river, safe water, long crossing routes.","sky_ruins":"Open edges. The chasm below is lethal.","deadfall":"Open edges. Cracked bridges collapse. Lethal fall.","grotto":"Safe pond. Violet mushroom caps crumble.","beaver_dam":"Blast through timber gates. Break the dam roof supports. Safe water.","shatter_spire":"Crack the stone piers. Collapse the central tower. Lethal fall."}
+const QUICK_IDS=["puddle_duel","bell_tower","last_leaf","matchbox","box_pillars"]
+const IDS=CLASSIC_IDS+EXPANSION_IDS+DESTRUCTION_IDS+QUICK_IDS
+const NAMES={"puddle_duel":"Puddle Duel","bell_tower":"Bell Tower","last_leaf":"Last Leaf","matchbox":"Matchbox","box_pillars":"Box Pillars","terrarium":"Terrarium","vineway":"Vineway","canopy":"Canopy","floodplain":"Floodplain","cycle":"Tour","reed_delta":"Reed Delta","sky_ruins":"Sky Ruins","deadfall":"Deadfall","grotto":"Glow Grotto","beaver_dam":"Beaver Dam","shatter_spire":"Shatter Spire"}
+const DESCRIPTIONS={"puddle_duel":"Tiny pond. Close-range crossfire and a tilting center.","bell_tower":"Narrow vertical climb. Open roof, lethal bottom.","last_leaf":"A short collapsing bridge. Open edges, lethal fall.","matchbox":"Tight quarters. Shoot out the wooden walls and roof.","box_pillars":"Two box towers. Shoot, grapple, and topple them. Lethal fall.","terrarium":"Tilting timber and familiar garden perches.","vineway":"Long swings across a wide, open middle.","canopy":"Climb the treetops using a rising platform.","floodplain":"Moving ferries above a wide stretch of water.","cycle":"A different arena after each match.","reed_delta":"Wide river, safe water, long crossing routes.","sky_ruins":"Open edges. The chasm below is lethal.","deadfall":"Open edges. Cracked bridges collapse. Lethal fall.","grotto":"Safe pond. Violet mushroom caps crumble.","beaver_dam":"Blast through timber gates. Break the dam roof supports. Safe water.","shatter_spire":"Crack the stone piers. Collapse the central tower. Lethal fall."}
 
 static func rules(id:String)->Dictionary:
 	match id:
+		"puddle_duel":return {"width":16.0,"height":9.0,"walls":true,"roof":true,"bottom":"water","theme":"reeds"}
+		"bell_tower":return {"width":12.0,"height":22.0,"walls":true,"roof":false,"bottom":"chasm","theme":"ruins"}
+		"last_leaf":return {"width":20.0,"height":11.0,"walls":false,"roof":false,"bottom":"chasm","theme":"autumn"}
+		"matchbox":return {"width":18.0,"height":12.0,"walls":true,"roof":true,"bottom":"water","theme":"reeds"}
+		"box_pillars":return {"width":20.0,"height":12.0,"walls":false,"roof":false,"bottom":"chasm","theme":"ruins"}
 		"beaver_dam":return {"width":34.0,"height":21.0,"walls":true,"roof":true,"bottom":"water","theme":"reeds"}
 		"shatter_spire":return {"width":34.0,"height":24.0,"walls":false,"roof":false,"bottom":"chasm","theme":"ruins"}
 		"reed_delta":return {"width":42.0,"height":22.0,"walls":true,"roof":true,"bottom":"water","theme":"reeds"}
@@ -18,6 +24,35 @@ static func rules(id:String)->Dictionary:
 
 static func layout(id:String)->Dictionary:
 	match id:
+		"puddle_duel":return {
+			"platforms":[[-5,2,4,"fixed"],[5,2,4,"fixed"],[-5,6.1,3.4,"fixed"],[5,6.1,3.4,"fixed"],[0,3.8,4,"seesaw"],[0,7.4,3,"fixed"]],
+			"spawns":[Vector2(-5.8,2.7),Vector2(5.8,2.7),Vector2(-5.8,6.8),Vector2(5.8,6.8)],
+			"hooks":[Vector2(-2,6),Vector2(2,6)],"crates":[],"bonus":[],
+			"weapons":[[-4.5,3,"bramble"],[4.5,3,"bramble"],[-4.5,7.1,"flame"],[4.5,7.1,"flame"],[0,4.8,"grenade"],[0,8.4,"seed"]]}
+		"bell_tower":return {
+			"platforms":[[-3.8,2,3,"fixed"],[3.8,2,3,"fixed"],[-3.8,10,3,"fixed"],[3.8,10,3,"fixed"],
+			[-3.6,6,3,"fixed"],[3.6,6,3,"fixed"],[0,12,2.4,"lift"],[-3.5,14.5,3,"fixed"],[3.5,14.5,3,"fixed"],[0,18.8,4,"fixed"]],
+			"spawns":[Vector2(-3.8,2.7),Vector2(3.8,2.7),Vector2(-3.8,10.7),Vector2(3.8,10.7)],
+			"hooks":[Vector2(0,5),Vector2(0,9),Vector2(-2,17),Vector2(2,17),Vector2(0,21)],"crates":[],"bonus":[],
+			"weapons":[[-3.2,3,"seed"],[3.2,3,"seed"],[-3.2,11,"acorn"],[3.2,11,"acorn"],[-3.5,15.5,"flame"],[3.5,15.5,"grenade"],[0,19.8,"rail"]]}
+		"last_leaf":return {
+			"platforms":[[-7.5,2.8,3.5,"fixed"],[7.5,2.8,3.5,"fixed"],[-7.5,7.1,3,"fixed"],[7.5,7.1,3,"fixed"],
+			[-4,3.6,2.6,"crumble"],[-1.35,3.6,2.6,"crumble"],[1.35,3.6,2.6,"crumble"],[4,3.6,2.6,"crumble"],[0,8.2,3,"swing"]],
+			"spawns":[Vector2(-7.5,3.5),Vector2(7.5,3.5),Vector2(-7.5,7.8),Vector2(7.5,7.8)],
+			"hooks":[Vector2(-4,7),Vector2(4,7),Vector2(0,10.5)],"crates":[],"bonus":[],
+			"weapons":[[-7,3.8,"acorn"],[7,3.8,"acorn"],[-7,8.1,"seed"],[7,8.1,"seed"],[-4,4.6,"grenade"],[4,4.6,"bramble"],[0,9.2,"rail"]]}
+		"matchbox":return {
+			"platforms":[[-6.7,2,3.4,"fixed"],[6.7,2,3.4,"fixed"],[-6.7,7,3.4,"fixed"],[6.7,7,3.4,"fixed"],
+			[0,2,7,"fixed"],[-2.5,4.1,.65,"barricade",{"height":3.4}],[2.5,4.1,.65,"barricade",{"height":3.4}],
+			[0,6.1,6,"timber",{"supports":[5,6]}],[0,9.8,3.5,"timber"]],
+			"spawns":[Vector2(-7,2.7),Vector2(7,2.7),Vector2(-7,7.7),Vector2(7,7.7)],
+			"hooks":[Vector2(-4,9),Vector2(4,9)],"crates":[],"bonus":[],
+			"weapons":[[-6,3,"flame"],[6,3,"flame"],[-6,8,"bramble"],[6,8,"bramble"],[0,3,"grenade"],[0,10.8,"rail"]]}
+		"box_pillars":return {
+			"platforms":[[-5,-.5,6,"pier",{"height":6.0,"walkable":true}],[5,-.5,6,"pier",{"height":6.0,"walkable":true}],[0,1,1.8,"crumble"]],
+			"spawns":[Vector2(-7.1,3.2),Vector2(7.1,3.2),Vector2(-2.9,3.2),Vector2(2.9,3.2)],
+			"hooks":[Vector2(-5,11),Vector2(5,11),Vector2(0,9)],"crates":[],"bonus":[],
+			"weapons":[[-6.4,3.5,"acorn"],[6.4,3.5,"acorn"],[-3.5,3.5,"seed"],[3.5,3.5,"seed"],[-5,9.6,"rail"],[5,9.6,"grenade"]]}
 		"beaver_dam":return {
 			"platforms":[[-13,3,5,"fixed"],[13,3,5,"fixed"],[-12,12,4,"fixed"],[12,12,4,"fixed"],
 			[0,2.2,8,"fixed"],[-3.3,4.5,.8,"barricade",{"height":4.2}],[3.3,4.5,.8,"barricade",{"height":4.2}],
@@ -95,10 +130,17 @@ static func stacks(id:String)->Array:
 		"sky_ruins":sites=[[-6,18.2,"stone"],[6,18.2,"stone"]]
 		"deadfall":sites=[[0,16.2,"wood"]]
 		"grotto":sites=[[-12,20.2,"stone"],[12,20.2,"stone"]]
+	if id=="box_pillars":
+		for x in [-5,5]:
+			sites.append([x,2.7,"wood"])
+		var towers:Array=[]
+		for site in sites:
+			towers.append({"x":site[0],"y":site[1],"material":"wood","pieces":[[0,.6,1.65,1.2,true],[.10,1.8,1.65,1.2,true],[-.10,3.0,1.65,1.2,true],[.05,4.2,1.65,1.2,true],[0,5.4,1.65,1.2,true]]})
+		return towers
 	var result:Array=[]
 	for site in sites:
 		result.append({"x":site[0],"y":site[1],"material":site[2],"pieces":[[-.72,.43,.95,.85],[.72,.43,.95,.85],[0,1.10,2.45,.48],[.08,1.71,.85,.72]]})
 	return result
 
 static func burr_site(id:String)->Array:
-	return {"terrarium":[0,5.8,"burr"],"vineway":[0,13,"burr"],"canopy":[0,15.6,"burr"],"floodplain":[0,14,"burr"],"reed_delta":[0,21.2,"burr"],"sky_ruins":[0,7,"burr"],"deadfall":[-4,8.2,"burr"],"grotto":[0,4.7,"burr"],"beaver_dam":[0,8,"burr"],"shatter_spire":[-8,9.7,"burr"]}.get(id,[0,5.8,"burr"])
+	return {"puddle_duel":[1,4.8,"burr"],"bell_tower":[0,13,"burr"],"last_leaf":[1.35,4.6,"burr"],"matchbox":[0,7.1,"burr"],"box_pillars":[0,2,"burr"],"terrarium":[0,5.8,"burr"],"vineway":[0,13,"burr"],"canopy":[0,15.6,"burr"],"floodplain":[0,14,"burr"],"reed_delta":[0,21.2,"burr"],"sky_ruins":[0,7,"burr"],"deadfall":[-4,8.2,"burr"],"grotto":[0,4.7,"burr"],"beaver_dam":[0,8,"burr"],"shatter_spire":[-8,9.7,"burr"]}.get(id,[0,5.8,"burr"])
