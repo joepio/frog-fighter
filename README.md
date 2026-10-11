@@ -241,8 +241,12 @@ simulation for frame-by-frame inspection. It is excluded from playable exports.
 ## GameNight integration
 
 During managed play, controller **Start** opens a pause menu with Resume,
-New round and Back to Game Room. It uses GameNight's controller frames and
-keeps the host's player assignments. A solo versus session receives one AI
+Map, Mode, Lives, Start new round and Back to Game Room. Use the D-pad or left
+stick up/down to select, left/right to change, and A to confirm. Resume keeps
+the current match; the three settings apply when starting a new round. Selected
+maps prepare in the background while paused, with a brief preparing screen if
+needed. It uses GameNight's controller frames and keeps the host's player
+assignments. A solo versus session receives one AI
 opponent when the host did not supply another seat; survival keeps the human
 team and spawns enemy waves. Back still opens the GameNight lobby.
 

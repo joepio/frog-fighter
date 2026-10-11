@@ -34,6 +34,7 @@ var preparing:=false
 var preparation_generation:=0
 var back_release:=0.0
 var managed_menu_buttons:=0xffffffff
+var restart_pending:=false
 var activity_timer:=0.0
 var capture_path:=""
 var capture_frame:=180
@@ -147,10 +148,13 @@ func show_menu()->void:
 	for p in sim.frogs:p.invincible=0.0
 
 func toggle_menu()->void:
+	if restart_pending:return
 	if paused_local:resume_local()
 	elif in_menu:start_local()
 	else:
 		paused_local=true;in_menu=true
+		hud.held_direction=Vector2i.ZERO
+		if bridge.launched_by_daemon:hud.menu_row=0
 		hud.make_menu()
 
 func resume_local()->void:
@@ -288,7 +292,9 @@ func deadzone(value:float)->float:return signf(value)*maxf(0,(absf(value)-.17)/.
 func _process(dt:float)->void:
 	game_audio.set_active(running and not in_menu, paused_local)
 	process_managed_menu()
-	if not paused_local and (running or in_menu):prepare_next_round()
+	if running or in_menu:prepare_next_round()
+	if restart_pending and running and bridge.phase=="running" and not preparing:
+		finish_managed_round()
 	process_back(dt)
 	if sim!=null and (running or in_menu) and not paused_local:world.update()
 	hud.queue_redraw()
@@ -339,25 +345,58 @@ func process_managed_menu()->void:
 			direction=Vector2i(int(absf(x)>.5)*int(signf(x)),int(absf(y)>.5)*int(signf(y)))
 			if Bridge.pressed(frame,12):direction.y=-1
 			elif Bridge.pressed(frame,13):direction.y=1
+			if Bridge.pressed(frame,14):direction.x=-1
+			elif Bridge.pressed(frame,15):direction.x=1
 	var pressed:=buttons & ~managed_menu_buttons
 	managed_menu_buttons=buttons
+	if restart_pending:return
 	if pressed & 128:
 		toggle_menu()
 		return
 	if not in_menu:return
-	if pressed & 1:hud.activate_row(hud.menu_row)
+	if pressed & 1:
+		hud.activate_row(hud.menu_row)
+		return # A can close the menu; held navigation must not recreate it.
 	if direction!=hud.held_direction:
 		hud.held_direction=direction;hud.repeat_delay=.36
 		if direction!=Vector2i.ZERO:hud.menu_move(direction)
 
 func managed_menu_action(row:int)->void:
-	if not running or bridge.phase!="running":return
+	if not in_menu or restart_pending or not running or bridge.phase!="running":return
 	match row:
 		0:resume_local()
-		1:
-			resume_local();new_round()
-		2:
+		1,2,3:managed_menu_change(row,1)
+		4:
+			# Changing mode only adjusts our generated solo opponent. Host seats
+			# and controller tokens always remain authoritative.
+			roster=roster.filter(func(p):return p.id!="frog-fighter-solo-bot")
+			add_solo_opponent()
+			restart_pending=true;in_menu=false;paused_local=true;hud.hide_menu()
+			prepare_next_round()
+			if not preparing:finish_managed_round()
+		5:
 			resume_local();bridge.request_overlay()
+
+func managed_menu_change(row:int,direction:int)->void:
+	if not in_menu or restart_pending:return
+	match row:
+		1:
+			var arenas:Array=Simulation.Arenas.IDS+["cycle"]
+			setting_changed("arena",arenas[posmod(arenas.find(selected_arena)+direction,arenas.size())])
+		2:setting_changed("mode","survival" if selected_mode=="versus" else "versus")
+		3:setting_changed("lives",posmod(round_lives-1+direction,9)+1)
+	hud.make_menu()
+
+func finish_managed_round()->void:
+	if not restart_pending or preparing:return
+	if pending_key!=round_key(roster):return
+	restart_pending=false
+	new_round();resume_local()
+
+func add_solo_opponent()->void:
+	if selected_mode=="versus" and roster.size()==1 and not roster[0].bot:
+		var slot:int=(int(roster[0].slot)+1)%4
+		roster.append({"slot":slot,"id":"frog-fighter-solo-bot","name":"Pond Bot","color":Simulation.COLORS[slot],"skin_color":"#eac794","avatar":{},"bot":true,"controller":""})
 
 func _input(event:InputEvent)->void:
 	if bridge.launched_by_daemon:return
@@ -401,28 +440,28 @@ func prepare(session:String,seats:Array,players:Array)->void:
 		used_tokens[token]=true
 		roster.append({"slot":slot,"id":id,"name":profile.get("name","Frog %d"%(slot+1)),"color":profile.get("color",Simulation.COLORS[slot%4]),"skin_color":profile.get("skin_color","#eac794"),"avatar":profile.get("avatar",{}),"bot":occupant.get("kind")=="ai","controller":token})
 	# Host seats stay authoritative; a solo versus match still needs an opponent.
-	if selected_mode=="versus" and roster.size()==1 and not roster[0].bot:
-		var slot:int=(int(roster[0].slot)+1)%4
-		roster.append({"slot":slot,"id":"frog-fighter-solo-bot","name":"Pond Bot","color":Simulation.COLORS[slot],"skin_color":"#eac794","avatar":{},"bot":true,"controller":""})
-	paused_local=false;managed_menu_buttons=0xffffffff
+	add_solo_opponent()
+	paused_local=false;restart_pending=false;managed_menu_buttons=0xffffffff
 	new_round()
 	if not headless and DisplayServer.window_get_mode()!=DisplayServer.WINDOW_MODE_MINIMIZED:await RenderingServer.frame_post_draw
 	else:await get_tree().process_frame
 	bridge.ready_for_session(session)
 
 func start_managed(_session:String)->void:
-	running=true;back_release=0;managed_menu_buttons=0xffffffff
+	running=true;paused_local=false;in_menu=false;restart_pending=false
+	hud.hide_menu();back_release=0;managed_menu_buttons=0xffffffff
 	# A minimized/offscreen preload can have an unrendered cached backdrop.
 	if is_instance_valid(world):
 		for node in world.find_children("*","Node3D",true,false):
 			if node.has_method("fit_camera") and node.has_method("refresh"):node.refresh()
 
 func pause_managed(_session:String)->void:
-	paused_local=false;in_menu=false;hud.hide_menu();managed_menu_buttons=0xffffffff
+	paused_local=false;in_menu=false;restart_pending=false;hud.hide_menu();managed_menu_buttons=0xffffffff
 	running=false
 
 
 func dispose_managed(_session:String)->void:
+	paused_local=false;in_menu=false;restart_pending=false;hud.hide_menu()
 	discard_prepared();celebrating=false;victory_time=0
 	running=false;roster=[];sim=null
 	if is_instance_valid(world):remove_child(world);world.queue_free()
