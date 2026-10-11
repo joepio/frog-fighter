@@ -1,7 +1,7 @@
 name: Publish GameNight preview
 on:
   workflow_run:
-    workflows: [Windows release]
+    workflows: [Frog Fighter, Windows release]
     types: [completed]
 permissions:
   contents: read

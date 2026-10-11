@@ -78,3 +78,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Compact arenas and box towers failed' }
           python tests/integration.py --godot $godot
           if ($LASTEXITCODE -ne 0) { throw 'Host lifecycle failed' }
+      - name: Package and verify the tested game
+        shell: pwsh
+        run: |
+          python tools/package.py --godot "$env:RUNNER_TEMP/godot/Godot_v4.5.2-stable_win64.exe" --output dist
+          if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
+          python tests/integration.py --godot "$PWD/dist/FrogFighter.exe" --packed
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged integration failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frog-fighter-windows
+          path: dist/frog-fighter-windows.zip
+          if-no-files-found: error
