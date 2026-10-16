@@ -900,6 +900,8 @@ func hurt(p:Dictionary,damage:float,impulse:Vector2,kind:String="contact",volley
 		while p.wounds.size()>6:p.wounds.pop_front()
 		p.flash=.12 if gentle else .19
 		add_fx("hit",impact,p.hit_dir,.14,kind)
+		add_fx("damage_confirm",impact,p.hit_dir,.28,kind)
+		fx.back()["color"]=p.color
 		add_fx("mist",impact,p.hit_dir,.60,kind)
 		blood(impact,impulse,0 if gentle else 2,Color(p.color),false)
 		delayed_gore.append({"delay":.04,"pos":impact,"impulse":impulse,"count":0 if gentle else (4 if kind!="seed" else 2),"skin":Color(p.color)})
@@ -1025,6 +1027,10 @@ func hurt_enemy(enemy:Dictionary,damage:float,impulse:Vector2,weapon:String)->vo
 	var color:=Color(ENEMY_STATS.get(enemy.get("kind","bee"),ENEMY_STATS.bee).color)
 	if weapon!="burn":burst(enemy.pos,color,2 if weapon=="flame" else 5)
 	if weapon not in ["flame","burn"]:add_fx("hit",enemy.pos,impulse.normalized(),.16,weapon);impact_stop(.012)
+	if weapon!="burn" and fx_clock>=float(enemy.get("feedback_at",-1.0)):
+		enemy["feedback_at"]=fx_clock+.14
+		add_fx("damage_confirm",enemy.pos,impulse.normalized(),.28,weapon)
+		events.append("hit")
 	if enemy.hp<=0:
 		burst(enemy.pos,color,24 if enemy.get("kind","")=="boss" else 12)
 		if enemy.get("kind","")=="boss":

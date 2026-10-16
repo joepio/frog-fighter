@@ -62,8 +62,10 @@ func _draw()->void:
 		draw_circle(Vector2(x+17,37),5,color)
 		text(p.name.left(12),Vector2(x+29,42),14,CREAM,bold)
 		for j in range(p.get("starting_lives",3)):draw_circle(Vector2(x+140+j*11,36),3,color if j<p.lives else Color("40523e"))
-		draw_rect(Rect2(x+13,54,182,3),Color("40523e"))
-		draw_rect(Rect2(x+13,54,182*clampf(p.hp/100,0,1),3),color)
+		draw_rect(Rect2(x+13,53,182,5),Color("40523e"))
+		draw_rect(Rect2(x+13,53,182*clampf(p.hp/100,0,1),5),color.lerp(CREAM,clampf(p.flash/.19,0,1)))
+		if p.flash>0:
+			draw_rect(Rect2(x,20,208,53),Color(1,.85,.56,clampf(p.flash/.19,0,1)),false,2.0)
 		if not p.alive:text("OUT",Vector2(x+13,69),10,MUTED)
 		elif p.respawn>0:text("%.1f"%p.respawn,Vector2(x+13,69),10,MUTED)
 		elif not p.weapon.is_empty():text("%d"%p.ammo,Vector2(x+175,69),10,MUTED)
@@ -71,6 +73,17 @@ func _draw()->void:
 			var aim:Vector2=game.world.screen_point(p.pos+p.aim*1.4)
 			draw_arc(aim,4,0,TAU,16,color,1.2,true)
 
+	# Confirm actual damage, not muzzle flashes or missed shots. The brief
+	# four-corner marker is legible over foliage without covering the character.
+	for effect in s.fx:
+		if effect.kind!="damage_confirm":continue
+		var age:float=effect.age/effect.life
+		var point:Vector2=game.world.screen_point(effect.pos)
+		var tint:=Color(effect.get("color","ffe6a0")).lightened(.4)
+		tint.a=1.0-age
+		for corner in [Vector2(-1,-1),Vector2(1,-1),Vector2(-1,1),Vector2(1,1)]:
+			draw_line(point+corner*(8+age*7),point+corner*(14+age*7),Color(0,0,0,tint.a*.6),5,true)
+			draw_line(point+corner*(8+age*7),point+corner*(14+age*7),tint,2.5,true)
 	if s.mode=="survival":
 		centered("Wave %d · %d left"%[s.wave,s.enemies.size()],Vector2(800,97),13,MUTED)
 		for enemy in s.enemies:

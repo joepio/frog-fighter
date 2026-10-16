@@ -42,3 +42,8 @@ Impact Sounds (1.0)
 	http://twitter.com/KenneyNL
 Source: https://kenney.nl/assets/impact-sounds
 Edited: trimming, filtering, fades and peak normalization. air, blast and success are original procedural designs.
+
+Combat refresh: tools/render_combat_audio.py makes original filtered blast and
+flame-loop layers. The shot family layers the existing CC0 Kenney heavy impact
+takes with original air-pressure and transient synthesis. No bit reduction or
+hard clipping is applied. Source and output are included in this repository.

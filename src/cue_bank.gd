@@ -11,9 +11,18 @@ var active := true
 var paused := false
 var clock := 0.0
 var serial := 0
+const BUS := &"CombatSound"
 
 func configure(definitions: Dictionary) -> void:
 	cues = definitions
+	if AudioServer.get_bus_index(BUS)<0:
+		AudioServer.add_bus()
+		var index:=AudioServer.bus_count-1
+		AudioServer.set_bus_name(index,BUS)
+		AudioServer.set_bus_send(index,&"Master")
+		var limiter:=AudioEffectHardLimiter.new()
+		limiter.ceiling_db=-2.0
+		AudioServer.add_bus_effect(index,limiter)
 	rng.randomize()
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	for spec in cues.values():
@@ -24,6 +33,7 @@ func configure(definitions: Dictionary) -> void:
 			streams[family].append(load("res://assets/sfx/%s_%d.wav" % [family, i+1]))
 	for i in 10:
 		var voice := AudioStreamPlayer.new()
+		voice.bus=BUS
 		voice.set_meta("serial", -1)
 		add_child(voice)
 		voices.append(voice)
@@ -58,9 +68,9 @@ func play_cue(cue: String, strength: float = 1.0) -> void:
 	var spec: Array = cues[cue]
 	if clock < float(cooldown.get(cue, -1.0)): return
 	cooldown[cue] = clock + float(spec[2])
-	# Two reserved voices keep round/success cues clear during contact bursts.
-	var first: int = 8 if spec[4] else 0
-	var last: int = 10 if spec[4] else 8
+	# Separate pools keep damage confirmation audible under rapid gunfire.
+	var first: int = 8 if spec[4] else (6 if cue=="hit" else 0)
+	var last: int = 10 if spec[4] else (8 if cue=="hit" else 6)
 	var voice := voices[first]
 	for i in range(first, last):
 		if not voices[i].playing:

@@ -215,11 +215,6 @@
     "peak": 0.65
   },
   {
-    "file": "blast_1.wav",
-    "seconds": 0.85,
-    "peak": 0.65
-  },
-  {
     "file": "success_1.wav",
     "seconds": 0.48,
     "peak": 0.65
@@ -227,11 +222,6 @@
   {
     "file": "air_2.wav",
     "seconds": 0.22,
-    "peak": 0.65
-  },
-  {
-    "file": "blast_2.wav",
-    "seconds": 0.85,
     "peak": 0.65
   },
   {
@@ -245,11 +235,6 @@
     "peak": 0.65
   },
   {
-    "file": "blast_3.wav",
-    "seconds": 0.85,
-    "peak": 0.65
-  },
-  {
     "file": "success_3.wav",
     "seconds": 0.48,
     "peak": 0.65
@@ -257,11 +242,6 @@
   {
     "file": "air_4.wav",
     "seconds": 0.22,
-    "peak": 0.65
-  },
-  {
-    "file": "blast_4.wav",
-    "seconds": 0.85,
     "peak": 0.65
   },
   {
@@ -275,13 +255,85 @@
     "peak": 0.65
   },
   {
-    "file": "blast_5.wav",
-    "seconds": 0.85,
-    "peak": 0.65
-  },
-  {
     "file": "success_5.wav",
     "seconds": 0.48,
     "peak": 0.65
+  },
+  {
+    "file": "blast_1.wav",
+    "seconds": 1.0,
+    "peak": 0.78,
+    "sample_rate": 44100,
+    "source": "tools/render_combat_audio.py"
+  },
+  {
+    "file": "shot_1.wav",
+    "seconds": 0.22,
+    "peak": 0.72,
+    "sample_rate": 44100,
+    "source": "tools/render_combat_audio.py"
+  },
+  {
+    "file": "blast_2.wav",
+    "seconds": 1.0,
+    "peak": 0.78,
+    "sample_rate": 44100,
+    "source": "tools/render_combat_audio.py"
+  },
+  {
+    "file": "shot_2.wav",
+    "seconds": 0.22,
+    "peak": 0.72,
+    "sample_rate": 44100,
+    "source": "tools/render_combat_audio.py"
+  },
+  {
+    "file": "blast_3.wav",
+    "seconds": 1.0,
+    "peak": 0.78,
+    "sample_rate": 44100,
+    "source": "tools/render_combat_audio.py"
+  },
+  {
+    "file": "shot_3.wav",
+    "seconds": 0.22,
+    "peak": 0.72,
+    "sample_rate": 44100,
+    "source": "tools/render_combat_audio.py"
+  },
+  {
+    "file": "blast_4.wav",
+    "seconds": 1.0,
+    "peak": 0.78,
+    "sample_rate": 44100,
+    "source": "tools/render_combat_audio.py"
+  },
+  {
+    "file": "shot_4.wav",
+    "seconds": 0.22,
+    "peak": 0.72,
+    "sample_rate": 44100,
+    "source": "tools/render_combat_audio.py"
+  },
+  {
+    "file": "blast_5.wav",
+    "seconds": 1.0,
+    "peak": 0.78,
+    "sample_rate": 44100,
+    "source": "tools/render_combat_audio.py"
+  },
+  {
+    "file": "shot_5.wav",
+    "seconds": 0.22,
+    "peak": 0.72,
+    "sample_rate": 44100,
+    "source": "tools/render_combat_audio.py"
+  },
+  {
+    "file": "flame_loop.wav",
+    "seconds": 2.0,
+    "peak": 0.62,
+    "sample_rate": 44100,
+    "source": "tools/render_combat_audio.py"
   }
 ]

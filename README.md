@@ -373,3 +373,17 @@ See [GameNight settings](docs/gamenight-settings.md) for all supported tweaks, t
 Audio uses five cached takes per material for jumps, landings, tongue casts, weapons, impacts, pickups and round wins. Sounds consume simulation events and pause with play. Bramble muzzle flashes use pale warm light and neutral smoke. Sound credits: `third_party/SOUND-CREDITS.txt`.
 
 Fresh Windows builds for this pass are in `build/audio-fx/`.
+
+Projectile attacks use layered impact takes rather than a UI click. Explosions
+have a filtered low-frequency body and a short attack; the flamethrower has one
+continuous two-second loop with a quick fade on release. Four simultaneous
+flamethrowers share the same volume. Pause and return-to-lobby stop the loop.
+Damage cues have reserved voices so gunfire cannot steal them, and a shared
+limiter keeps the combat mix below full scale. Actual damage briefly marks the
+victim with colored brackets and flashes their health bar. Misses and rejected
+damage do not show confirmation.
+
+Regenerate the original combat layers with `python tools/render_combat_audio.py`.
+Run `tests/combat_audio.gd`, `tests/audio_bank.gd`, and `tests/combat.gd` for the
+audio lifecycle, bounded mix, and damage-confirmation checks. These checks do not
+replace a listening test on the actual TV speakers.

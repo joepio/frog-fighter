@@ -246,7 +246,9 @@ func _physics_process(dt:float)->void:
 		sim.update_aim(inputs);return
 	sim.step(dt,inputs)
 	if running and not in_menu:
-		for cue in sim.events: game_audio.play_cue(cue)
+		for cue in sim.events:
+			if cue!="fire_flame":game_audio.play_cue(cue)
+		game_audio.update_flame(sim.frogs,dt)
 
 func controls(p:Dictionary)->Dictionary:
 	if bridge.launched_by_daemon:

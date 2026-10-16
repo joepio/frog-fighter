@@ -34,7 +34,9 @@ func run() -> void:
 	bank.clock += 2.0
 	bank.play_cue(bank.cues.keys()[0])
 	check(bank.serial==before+1, "Bank resumes after pause")
-	check(bank.get_child_count()==10, "Hot path creates no extra players")
+	check(bank.get_child_count()==11, "Ten cue voices and one shared flame loop stay bounded")
+	await create_timer(.25).timeout
 	bank.free()
+	await create_timer(.1).timeout
 	print("Audio bank: ",failures," failures")
 	quit(failures)

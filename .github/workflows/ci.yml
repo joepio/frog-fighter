@@ -34,6 +34,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Settings failed' }
           & $godot --headless --path . --script res://tests/audio_bank.gd
           if ($LASTEXITCODE -ne 0) { throw 'Audio bank failed' }
+          & $godot --headless --path . --script res://tests/combat_audio.gd
+          if ($LASTEXITCODE -ne 0) { throw 'Combat sound and flame lifecycle failed' }
           & $godot --headless --path . --script res://tests/managed_play.gd
           if ($LASTEXITCODE -ne 0) { throw 'Managed solo play and Start menu failed' }
           & $godot --headless --path . --script res://tests/run.gd

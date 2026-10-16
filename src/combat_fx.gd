@@ -100,7 +100,7 @@ func update(sim:RefCounted)->void:
 		var b:Dictionary=bursts[i];b.root.visible=i<sim.fx.size()
 		if not b.root.visible:continue
 		var effect:Dictionary=sim.fx[i];var t:float=effect.age/effect.life
-		if effect.kind=="impact_blast":b.root.visible=false;continue
+		if effect.kind in ["impact_blast","damage_confirm"]:b.root.visible=false;continue
 		var is_smoke:bool=effect.kind=="smoke"
 		var is_mist:bool=effect.kind in ["mist","mist_ko"]
 		var is_flame:bool=effect.kind=="flame"

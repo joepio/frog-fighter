@@ -20,9 +20,11 @@ func run()->void:
 	check(victim.hp==50,"All five bramble pellets can damage one target")
 	check(s.fx.filter(func(f):return f.kind=="hit").size()==1,"One impact flash per bramble volley")
 	check(s.events.count("hit")==1,"One impact sound per bramble volley")
+	check(s.fx.filter(func(f):return f.kind=="damage_confirm").size()==1,"One readable damage marker per volley")
 	check(s.hitstop<=.0451,"Bramble pellets do not stack hit-stop")
 	s.hurt(victim,10,Vector2.RIGHT,"seed",2)
 	check(victim.hp==50,"Different volley respects brief damage invulnerability")
+	check(s.fx.filter(func(f):return f.kind=="damage_confirm").size()==1,"Rejected damage cannot display a false confirmation")
 	var time:float=s.clock;var position:Vector2=victim.pos
 	s.step(1.0/120,[{},{}])
 	check(s.clock==time and victim.pos==position,"Hit-stop freezes world motion")
