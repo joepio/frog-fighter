@@ -88,7 +88,7 @@ def render():
     manifest = json.loads((OUT / "manifest.json").read_text())
     replaced = {entry["file"] for entry in entries}
     manifest = [entry for entry in manifest if entry["file"] not in replaced] + entries
-    (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2)+"\n")
+    (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2)+"\n", newline="\n")
     print(f"Rendered {len(entries)} combat clips at {RATE} Hz; peak <= -2.1 dBFS")
 
 
