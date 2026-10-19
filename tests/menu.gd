@@ -61,7 +61,7 @@ func run()->void:
 	var control:Button=null
 	for item in game.hud.menu.get_children():
 		if item.get_meta("menu_key","")=="players":control=item
-	game.hud.menu_row=1
+	game.hud.menu_row=2
 	var right:=InputEventJoypadButton.new();right.button_index=JOY_BUTTON_DPAD_RIGHT;right.pressed=true
 	root.push_input(right,true);right.pressed=false;root.push_input(right,true)
 	check(game.human_count==3,"D-pad right changes player count immediately without A")
@@ -69,9 +69,9 @@ func run()->void:
 	check(game.human_count==4 and game.bot_count==0,"Visible player selector updates team size and bot capacity")
 	var down:=InputEventJoypadMotion.new();down.axis=JOY_AXIS_LEFT_Y;down.axis_value=.9
 	root.push_input(down,true)
-	check(game.hud.menu_row==3,"Stick down skips unavailable bots row")
+	check(game.hud.menu_row==4,"Stick down skips unavailable bots row")
 	root.push_input(down,true)
-	check(game.hud.menu_row==3,"Repeated axis events do not skip multiple rows")
+	check(game.hud.menu_row==4,"Repeated axis events do not skip multiple rows")
 	down.axis_value=0;root.push_input(down,true)
 	game.start_local()
 	game.bridge.launched_by_daemon=true
@@ -85,7 +85,7 @@ func run()->void:
 	game.bridge.launched_by_daemon=false
 	var a:Vector2=game.world.screen_point(Vector2(-5,5));var b:Vector2=game.world.screen_point(Vector2(5,5))
 	check(b.x>a.x,"Camera keeps rightward movement screen-right")
-	game.show_menu();game.set_arena("terrarium");game.hud.menu_row=4
+	game.show_menu();game.set_arena("terrarium");game.hud.menu_row=5
 	game.hud.menu_move(Vector2i.RIGHT)
 	check(game.selected_arena=="vineway","Level row cycles directly with right")
 	game.load_settings();check(game.selected_arena=="vineway","Arena selection is saved")

@@ -144,7 +144,7 @@ func select_mode(value:String)->void:
 
 func show_menu()->void:
 	paused_local=false;in_menu=true;running=false;roster=local_roster(true)
-	new_round();sim.countdown=0;hud.make_menu()
+	new_round();sim.countdown=0;hud.menu_row=0;hud.make_menu()
 	for p in sim.frogs:p.invincible=0.0
 
 func toggle_menu()->void:
@@ -154,7 +154,7 @@ func toggle_menu()->void:
 	else:
 		paused_local=true;in_menu=true
 		hud.held_direction=Vector2i.ZERO
-		if bridge.launched_by_daemon:hud.menu_row=0
+		hud.menu_row=0
 		hud.make_menu()
 
 func resume_local()->void:
@@ -367,8 +367,8 @@ func managed_menu_action(row:int)->void:
 	if not in_menu or restart_pending or not running or bridge.phase!="running":return
 	match row:
 		0:resume_local()
-		1,2,3:managed_menu_change(row,1)
-		4:
+		2,3,4:managed_menu_change(row,1)
+		1:
 			# Changing mode only adjusts our generated solo opponent. Host seats
 			# and controller tokens always remain authoritative.
 			roster=roster.filter(func(p):return p.id!="frog-fighter-solo-bot")
@@ -382,11 +382,11 @@ func managed_menu_action(row:int)->void:
 func managed_menu_change(row:int,direction:int)->void:
 	if not in_menu or restart_pending:return
 	match row:
-		1:
+		2:
 			var arenas:Array=Simulation.Arenas.IDS+["cycle"]
 			setting_changed("arena",arenas[posmod(arenas.find(selected_arena)+direction,arenas.size())])
-		2:setting_changed("mode","survival" if selected_mode=="versus" else "versus")
-		3:setting_changed("lives",posmod(round_lives-1+direction,9)+1)
+		3:setting_changed("mode","survival" if selected_mode=="versus" else "versus")
+		4:setting_changed("lives",posmod(round_lives-1+direction,9)+1)
 	hud.make_menu()
 
 func finish_managed_round()->void:

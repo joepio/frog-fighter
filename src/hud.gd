@@ -39,19 +39,13 @@ func _draw()->void:
 		return
 	if game.in_menu:
 		if game.bridge.launched_by_daemon:
-			panel(Rect2(470,130,660,650),Color(.045,.09,.065,.96),22)
-			centered("Paused",Vector2(800,190),38,CREAM,serif)
-			centered("Map, mode and lives apply to the next round",Vector2(800,224),17,MUTED)
-			centered(game.Simulation.Arenas.DESCRIPTIONS[game.selected_arena],Vector2(800,668),14,MUTED)
-			centered("↑ ↓ Select    ← → Change    A Confirm",Vector2(800,712),18,CREAM)
-			centered("Start resumes    •    Back opens Game Room",Vector2(800,746),16,MUTED)
+			panel(Rect2(250,140,600,560),Color(.045,.09,.065,.96),22)
+			centered("Frog Fighter",Vector2(550,210),40,CREAM,serif)
+			draw_controls(Vector2(880,140))
 			return
-		panel(Rect2(70,95,500,710),Color(.045,.09,.065,.96),22)
+		panel(Rect2(70,95,500,165+(action_rows()+6)*58),Color(.045,.09,.065,.96),22)
 		text("Frog Fighter",Vector2(106,168),43,CREAM,serif)
-		text("Paused" if game.paused_local else "Make yourself at home.",Vector2(109,204),17,MUTED)
-		text(game.Simulation.Arenas.DESCRIPTIONS[game.selected_arena],Vector2(109,723),13,MUTED)
-		text("↑ ↓  Select     ← →  Change",Vector2(109,754),17,CREAM)
-		text("Start / Esc resume" if game.paused_local else "Start to play",Vector2(109,781),14,MUTED)
+		draw_controls(Vector2(600,95))
 		return
 	var count:int=s.frogs.size()
 	for i in range(count):
@@ -99,8 +93,49 @@ func _draw()->void:
 	if game.celebrating:
 		centered(game.last_result,Vector2(800,166),36,CREAM,bold)
 
+# Xbox face-button colours; shoulders, triggers and sticks stay neutral.
+const BUTTON_COLORS={"A":Color("5fb336"),"B":Color("e0393e"),"X":Color("2f7fdf"),"Y":Color("f2c12e")}
+
+func control_glyph(label:String,center:Vector2)->void:
+	if BUTTON_COLORS.has(label):
+		draw_circle(center,15,BUTTON_COLORS[label])
+		centered(label,center+Vector2(0,6),16,Color("10180f"),bold)
+		return
+	var w:float=maxf(34,bold.get_string_size(label,HORIZONTAL_ALIGNMENT_LEFT,-1,13).x+16)
+	panel(Rect2(center.x-w*.5,center.y-13,w,26),Color("3b503a"),8 if label.length()<3 else 13)
+	centered(label,center+Vector2(0,5),13,CREAM,bold)
+
+func draw_controls(origin:Vector2)->void:
+	var rows:Array=[
+		[["LS"],"Move, climb, reel tongue"],
+		[["RS"],"Aim weapon and tongue"],
+		[["LB","A"],"Jump, hold for height"],
+		[["RT","RB"],"Shoot"],
+		[["LT"],"Tongue grapple, hold"],
+		[["X"],"Throw weapon"],
+		[["B"],"Hold to cling underneath"],
+		[["Start"],"Pause menu"],
+		[["Back"],"Game Room" if game.bridge.launched_by_daemon else "Pause menu"],
+	]
+	var height:float=150+rows.size()*46
+	panel(Rect2(origin,Vector2(470,height)),Color(.045,.09,.065,.9),22)
+	text("Controls",origin+Vector2(32,54),22,CREAM,bold)
+	for i in rows.size():
+		var y:float=origin.y+98+i*46
+		var glyphs:Array=rows[i][0]
+		for j in glyphs.size():control_glyph(glyphs[j],Vector2(origin.x+52+j*46,y))
+		text(rows[i][1],Vector2(origin.x+150,y+7),18,CREAM)
+	text("Stick down + jump drops through a platform",Vector2(origin.x+32,origin.y+height-26),14,MUTED)
+
+func action_rows()->int:
+	return 2 if game.paused_local else 1
+
+# Settings come after Resume/New match (or Play) so round actions stay on top.
+func setting_of(row:int)->int:
+	return row-action_rows()
+
 func row_enabled(row:int)->bool:
-	return row!=2 or (game.selected_mode=="versus" and game.human_count<4)
+	return setting_of(row)!=2 or (game.selected_mode=="versus" and game.human_count<4)
 
 func menu_move(direction:Vector2i)->void:
 	if not game.in_menu:return
@@ -109,18 +144,18 @@ func menu_move(direction:Vector2i)->void:
 		elif direction.x!=0:game.managed_menu_change(menu_row,direction.x)
 		return
 	if direction.y!=0:
-		var count:int=8 if game.paused_local else 7
+		var count:int=action_rows()+6
 		menu_row=posmod(menu_row+direction.y,count)
 		if not row_enabled(menu_row):menu_row=posmod(menu_row+direction.y,count)
 		make_menu()
-	elif direction.x!=0 and menu_row<6:cycle_value(direction.x)
+	elif direction.x!=0 and setting_of(menu_row)>=0:cycle_value(direction.x)
 
 func cycle_value(direction:int)->void:
-	match menu_row:
+	match setting_of(menu_row):
 		0:game.select_mode("survival" if game.selected_mode=="versus" else "versus")
 		1:game.set_players(posmod(game.human_count-1+direction,4)+1)
 		2:
-			if not row_enabled(2):return
+			if not row_enabled(menu_row):return
 			var minimum:int=1 if game.human_count==1 else 0
 			var count:int=5-game.human_count-minimum
 			game.set_bots(minimum+posmod(game.bot_count-minimum+direction,count))
@@ -136,8 +171,8 @@ func activate_row(row:int)->void:
 		game.managed_menu_action(row)
 		return
 	menu_row=row
-	if row<6:cycle_value(1)
-	elif row==6 and game.paused_local:game.resume_local()
+	if setting_of(row)>=0:cycle_value(1)
+	elif row==0 and game.paused_local:game.resume_local()
 	else:game.start_local()
 
 func menu_input(event:InputEvent)->bool:
@@ -145,7 +180,7 @@ func menu_input(event:InputEvent)->bool:
 	var released:=false
 	if event is InputEventKey:
 		if event.keycode in [KEY_ENTER,KEY_SPACE]:
-			if event.pressed and not event.echo and menu_row>=6:activate_row(menu_row)
+			if event.pressed and not event.echo and setting_of(menu_row)<0:activate_row(menu_row)
 			return true
 		direction={KEY_UP:Vector2i.UP,KEY_DOWN:Vector2i.DOWN,KEY_LEFT:Vector2i.LEFT,KEY_RIGHT:Vector2i.RIGHT}.get(event.keycode,Vector2i.ZERO)
 		if direction==Vector2i.ZERO:return false
@@ -153,7 +188,7 @@ func menu_input(event:InputEvent)->bool:
 		released=not event.pressed
 	elif event is InputEventJoypadButton:
 		if event.button_index==JOY_BUTTON_A:
-			if event.pressed and menu_row>=6:activate_row(menu_row)
+			if event.pressed and setting_of(menu_row)<0:activate_row(menu_row)
 			return true
 		direction={JOY_BUTTON_DPAD_UP:Vector2i.UP,JOY_BUTTON_DPAD_DOWN:Vector2i.DOWN,JOY_BUTTON_DPAD_LEFT:Vector2i.LEFT,JOY_BUTTON_DPAD_RIGHT:Vector2i.RIGHT}.get(event.button_index,Vector2i.ZERO)
 		if direction==Vector2i.ZERO:return false
@@ -187,11 +222,11 @@ func make_menu()->void:
 	menu=Control.new();menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);menu.mouse_filter=Control.MOUSE_FILTER_IGNORE;add_child(menu)
 	if game.bridge.launched_by_daemon:
 		menu_row=clampi(menu_row,0,5)
-		var labels:Array=["Resume","Map","Mode","Lives","Start new round","Back to Game Room"]
-		var values:Array=["",game.Simulation.Arenas.NAMES[game.selected_arena],game.selected_mode.capitalize(),str(game.round_lives),"",""]
+		var labels:Array=["Resume","Start new round","Map","Mode","Lives","Back to Game Room"]
+		var values:Array=["","",game.Simulation.Arenas.NAMES[game.selected_arena],game.selected_mode.capitalize(),str(game.round_lives),""]
 		for row in 6:
-			var button:=Button.new();button.position=Vector2(505,250+row*64);button.size=Vector2(590,55)
-			button.set_meta("menu_key",["resume","arena","mode","lives","restart","lobby"][row])
+			var button:=Button.new();button.position=Vector2(285,256+row*64);button.size=Vector2(530,55)
+			button.set_meta("menu_key",["resume","restart","arena","mode","lives","lobby"][row])
 			button.text=labels[row]+("    ‹  "+values[row]+"  ›" if not values[row].is_empty() else "")
 			button.focus_mode=Control.FOCUS_NONE
 			button.add_theme_font_override("font",bold);button.add_theme_font_size_override("font_size",24)
@@ -201,16 +236,19 @@ func make_menu()->void:
 			button.pressed.connect(func():activate_row(row));menu.add_child(button)
 		queue_redraw()
 		return
-	menu_row=clampi(menu_row,0,7 if game.paused_local else 6)
-	if not row_enabled(menu_row):menu_row=3
-	var labels:Array=["Mode","Players","Bots","Lives","Level","Display","Resume" if game.paused_local else "Play"]
-	var values:Array=[game.selected_mode.capitalize(),str(game.human_count),str(game.bot_count) if game.selected_mode=="versus" else "—",str(game.round_lives),game.Simulation.Arenas.NAMES[game.selected_arena],"Full screen" if game.fullscreen else "Window",""]
-	if game.paused_local:labels.append("New match");values.append("")
+	menu_row=clampi(menu_row,0,action_rows()+5)
+	if not row_enabled(menu_row):menu_row=action_rows()+3
+	var labels:Array=["Resume","New match"] if game.paused_local else ["Play"]
+	var values:Array=["",""] if game.paused_local else [""]
+	var keys:Array=["start","restart"] if game.paused_local else ["start"]
+	labels.append_array(["Mode","Players","Bots","Lives","Level","Display"])
+	values.append_array([game.selected_mode.capitalize(),str(game.human_count),str(game.bot_count) if game.selected_mode=="versus" else "—",str(game.round_lives),game.Simulation.Arenas.NAMES[game.selected_arena],"Full screen" if game.fullscreen else "Window"])
+	keys.append_array(["mode","players","bots","lives","arena","display"])
 	for row in range(labels.size()):
 		var selected:bool=row==menu_row
 		var enabled:bool=row_enabled(row)
-		var b:=Button.new();b.position=Vector2(105,239+row*58);b.size=Vector2(430,51);b.focus_mode=Control.FOCUS_NONE
-		b.set_meta("menu_key",["mode","players","bots","lives","arena","display","start","restart"][row])
+		var b:=Button.new();b.position=Vector2(105,215+row*58);b.size=Vector2(430,51);b.focus_mode=Control.FOCUS_NONE
+		b.set_meta("menu_key",keys[row])
 		b.disabled=not enabled
 		for state in ["normal","hover","pressed","disabled"]:
 			var style:=StyleBoxFlat.new();style.set_corner_radius_all(9)
@@ -222,7 +260,7 @@ func make_menu()->void:
 		var label:=Label.new();label.position=Vector2(18,14);label.text=labels[row];label.add_theme_font_override("font",bold);label.add_theme_font_size_override("font_size",19)
 		label.add_theme_color_override("font_color",Color("20311c") if selected else (CREAM if enabled else Color("72816b")));label.mouse_filter=Control.MOUSE_FILTER_IGNORE;b.add_child(label)
 		var value:=Label.new();value.position=Vector2(190,14);value.size=Vector2(222,27);value.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
-		value.text=("‹  "+values[row]+"  ›") if row<6 and enabled else values[row]
+		value.text=("‹  "+values[row]+"  ›") if setting_of(row)>=0 and enabled else values[row]
 		value.add_theme_font_override("font",bold);value.add_theme_font_size_override("font_size",19);value.add_theme_color_override("font_color",Color("20311c") if selected else (CREAM if enabled else Color("72816b")));value.mouse_filter=Control.MOUSE_FILTER_IGNORE;b.add_child(value)
 	queue_redraw()
 

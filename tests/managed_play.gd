@@ -53,6 +53,7 @@ func run()->void:
 	frame(0);frame(128);check(not game.in_menu and not game.paused_local,"Fresh Start resumes same match")
 	frame(0);frame(128);frame(0);frame(8192)
 	check(game.hud.menu_row==1,"Host D-pad navigates managed menu")
+	frame(0);frame(8192);check(game.hud.menu_row==2,"Map row sits below the round actions")
 	var old:RefCounted=game.sim
 	tap(32768)
 	check(game.selected_arena=="vineway" and game.settings.values.arena=="vineway","Host D-pad right changes selected map")
@@ -74,8 +75,8 @@ func run()->void:
 	check(not game.in_menu and not game.paused_local and game.hud.menu==null,"Held navigation and delayed rebuild cannot resurrect closed menu")
 	await capture("-resumed")
 	tap(128)
-	for i in 4:tap(8192)
-	check(game.hud.menu_row==4,"D-pad reaches Start new round")
+	tap(8192)
+	check(game.hud.menu_row==1,"Start new round sits directly under Resume")
 	tap(1)
 	check(game.hud.menu==null,"New round immediately removes all menu controls")
 	await settle()
@@ -88,11 +89,11 @@ func run()->void:
 		check(game.hud.menu==null and not game.in_menu,"Repeated Resume has no orphan controls")
 	for i in 3:
 		tap(128)
-		for row in 4:tap(8192)
+		tap(8192)
 		old=game.sim;tap(1);await settle()
 		check(game.sim!=old and not game.paused_local and game.hud.menu==null,"Repeated New round closes and resumes reliably")
 	# Host pause can interrupt an unfinished map build without a delayed restart.
-	tap(128);game.setting_changed("arena","grotto");game.hud.menu_row=4
+	tap(128);game.setting_changed("arena","grotto");game.hud.menu_row=1
 	old=game.sim;tap(1)
 	check(game.restart_pending and game.preparing,"Cold map starts an incremental transition")
 	game.bridge.phase="paused";game.pause_managed("solo");await settle()
