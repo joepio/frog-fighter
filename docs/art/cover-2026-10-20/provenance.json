@@ -1,0 +1,20 @@
+{
+  "game": "frog-fighter",
+  "generated_on": "2026-10-20",
+  "generator": "Built-in image_gen",
+  "use": "Illustrated promotional cover, not a gameplay screenshot",
+  "prompt": "Use case: stylized-concept. Create a finished premium indie game cover for GameNight. Portrait 3:4 composition, ideally 1536x2048. Full bleed artwork, no frame. The supplied screenshot is a reference for the actual game's identity, not an image to copy or a screenshot to decorate. Reimagine it as beautiful authored key art. A striking clear silhouette and deliberate composition, carefully crafted materials and lighting, rich but controlled detail. A large beautifully designed title occupies the upper quarter, stays entirely inside safe margins and is legible at 180 pixels wide. No subtitle, badge, developer/publisher logos, watermark, UI, scores, or interface text. Do not imitate another game's branding. Title exactly 'FROG FIGHTER' in two bold cream lines with moss-green dimensional edges, highly readable. Four charming round cartoon frogs in green, cyan, coral and golden yellow, huge expressive bulbous eyes, tiny limbs and plump bodies matching the reference, battling inside a lush miniature glass terrarium. Hero green frog swings on an elongated pink tongue tethered above while holding a small improvised twig-and-seed blaster, cyan frog leaps between rope-hung wooden platforms, coral and yellow rivals further behind. Ferns, terracotta plant pots, shelf mushrooms on a tree trunk, shallow water and waterfall. Dynamic diagonal action, splintered wood, tiny seeds in flight. Tangible crafted 3D forms, warm sunbeams and cool jade water. Beautiful clear character hierarchy; no gore.",
+  "reference": "reference.png",
+  "master": "cover-source.png",
+  "runtime": "../../../assets/gamenight/cover.png",
+  "export": {
+    "width": 360,
+    "height": 480,
+    "format": "indexed PNG",
+    "max_bytes": 262144,
+    "colors": 256,
+    "command": "magick cover-source.png -resize 360x480! -strip -dither FloydSteinberg -colors 256 -define png:compression-level=9 PNG8:cover.png"
+  },
+  "review": "Actual game rendered and inspected; generated master and final 360x480 cover visually reviewed. Promotional illustration, not gameplay.",
+  "source_revision": "3e1b6dcc16cc6976a20c87965668ea0d1a427e09"
+}
