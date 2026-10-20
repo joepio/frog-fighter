@@ -1,4 +1,5 @@
 extends Control
+const GAME_LOGO = preload("res://assets/branding/logo.png")
 var game:Node
 var serif:SystemFont
 var sans:SystemFont
@@ -40,11 +41,11 @@ func _draw()->void:
 	if game.in_menu:
 		if game.bridge.launched_by_daemon:
 			panel(Rect2(250,140,600,560),Color(.045,.09,.065,.96),22)
-			centered("Frog Fighter",Vector2(550,210),40,CREAM,serif)
+			draw_game_logo(Rect2(310, 151, 480, 90))
 			draw_controls(Vector2(880,140))
 			return
 		panel(Rect2(70,95,500,165+(action_rows()+6)*58),Color(.045,.09,.065,.96),22)
-		text("Frog Fighter",Vector2(106,168),43,CREAM,serif)
+		draw_game_logo(Rect2(106, 108, 430, 95))
 		draw_controls(Vector2(600,95))
 		return
 	var count:int=s.frogs.size()
@@ -296,3 +297,8 @@ func portrait(p:Dictionary,center:Vector2,radius:float)->void:
 	else:
 		draw_circle(center+Vector2(-3,-2),1.5,Color("263429"));draw_circle(center+Vector2(3,-2),1.5,Color("263429"))
 		draw_line(center+Vector2(-3,4),center+Vector2(3,4),Color("263429"),1)
+
+func draw_game_logo(bounds: Rect2) -> void:
+	var dimensions: Vector2 = GAME_LOGO.get_size()
+	var fitted := dimensions * minf(bounds.size.x / dimensions.x, bounds.size.y / dimensions.y)
+	draw_texture_rect(GAME_LOGO, Rect2(bounds.position + (bounds.size - fitted) * 0.5, fitted), false)
