@@ -214,7 +214,7 @@ func build_stage(incremental:bool=false)->void:
 
 func build_actors()->void:
 	for p in sim.frogs:
-		frogs.append(make_frog(Color(p.color)))
+		frogs.append(make_frog(Color(p.color),frogs.size()))
 		var shadow_mat:=StandardMaterial3D.new();shadow_mat.albedo_color=Color(.08,.10,.06,.3);shadow_mat.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
 		shadow_mat.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
 		var shadow:=ball(self,Vector3.ZERO,Vector3(.53*sim.FROG_SCALE,.012,.36*sim.FROG_SCALE),Color.WHITE);shadow.material_override=shadow_mat
@@ -293,12 +293,18 @@ func flower(pos:Vector3)->void:
 			petal.rotation=Vector3(0,-a,.24+layer*.2)
 	ball(self,pos+Vector3(0,.17,0),Vector3(.1,.065,.1),Color("d8ad53"))
 
-func make_frog(color:Color)->Dictionary:
+# Each seat gets its own frog: a pirate, a big one, a grandpa and a rocker.
+const CHARACTERS:=["pirate","chonk","grandpa","rocker"]
+
+func make_frog(color:Color,index:int=0)->Dictionary:
+	var character:String=CHARACTERS[posmod(index,CHARACTERS.size())]
+	var girth:float=1.38 if character=="chonk" else 1.0
 	var root:=Node3D.new();add_child(root);root.scale=Vector3.ONE*sim.FROG_SCALE
 	var body:=Node3D.new();root.add_child(body)
-	ball(body,Vector3(0,-.04,0),Vector3(.52,.55,.39),color)
-	ball(body,Vector3(0,-.12,.28),Vector3(.35,.38,.13),color.lerp(Color("e8d9a7"),.48))
-	ball(body,Vector3(0,.27,.015),Vector3(.55,.3,.34),color)
+	var torso:=Vector3(.52*girth,.55,.39*girth)
+	ball(body,Vector3(0,-.04,0),torso,color)
+	ball(body,Vector3(0,-.12,.28*girth),Vector3(.35*girth,.38,.13*girth),color.lerp(Color("e8d9a7"),.48))
+	ball(body,Vector3(0,.27,.015),Vector3(.55*(1+(girth-1)*.5),.3,.34),color)
 	var pupils:Array=[];var eyewhites:Array=[];var lids:Array=[];var brows:Array=[]
 	for side in [-1,1]:
 		ball(body,Vector3(side*.28,.54,.12),Vector3(.2,.24,.2),color)
@@ -322,7 +328,7 @@ func make_frog(color:Color)->Dictionary:
 			var x:float=-.31+(i+corner.x)*.62/24
 			var y:float=.135+.065*pow(x/.31,2)+corner.y*.009
 			var head_z:float=.015+.34*sqrt(maxf(0,1-pow(x/.55,2)-pow((y-.27)/.3,2)))
-			var torso_z:float=.39*sqrt(maxf(0,1-pow(x/.52,2)-pow((y+.04)/.55,2)))
+			var torso_z:float=torso.z*sqrt(maxf(0,1-pow(x/torso.x,2)-pow((y+.04)/torso.y,2)))
 			smile.add_vertex(Vector3(x,y,maxf(head_z,torso_z)+.01))
 	smile.generate_normals()
 	var mouth_material:=StandardMaterial3D.new();mouth_material.albedo_color=color.darkened(.55);mouth_material.cull_mode=BaseMaterial3D.CULL_DISABLED
@@ -346,7 +352,7 @@ func make_frog(color:Color)->Dictionary:
 	for i in range(3):ball(offhand,Vector3(-.36+i*.07,-.29,.17),Vector3(.055,.09,.06),color)
 	for i in range(9):
 		var a:float=i*2.4
-		ball(body,Vector3(sin(a)*.43,-.13+cos(a)*.25,.28),Vector3(.028,.022,.016),color.darkened(.1))
+		ball(body,Vector3(sin(a)*.43*girth,-.13+cos(a)*.25,.28*girth),Vector3(.028,.022,.016),color.darkened(.1))
 	var arm:=Node3D.new();body.add_child(arm)
 	ball(arm,Vector3(.52,0,.07),Vector3(.27,.12,.14),color)
 	ball(arm,Vector3(.7,0,.07),Vector3(.13,.15,.15),color)
@@ -354,6 +360,7 @@ func make_frog(color:Color)->Dictionary:
 	var models:Array=ForestWeapons.build(self,gun)
 	var fire_light:=OmniLight3D.new();gun.add_child(fire_light);fire_light.position=Vector3(.72,0,.2)
 	fire_light.light_color=FlameStyle.color(.65);fire_light.omni_range=3;fire_light.light_energy=.9;fire_light.visible=false
+	dress_frog(body,character,color)
 	var flash:=ShaderMaterial.new();flash.shader=load("res://src/hit_flash.gdshader")
 	var skin_meshes:Array=[]
 	collect_skin(body,skin_meshes,gun)
@@ -366,7 +373,47 @@ func make_frog(color:Color)->Dictionary:
 		wounds.append(wound)
 	var tongue:=Node3D.new();root.add_child(tongue)
 	var burning:=Burning.new();root.add_child(burning);burning.build(self)
-	return {"root":root,"body":body,"closed_mouth":closed_mouth,"open_mouth":open_mouth,"brows":brows,"flash":flash,"skin_meshes":skin_meshes,"flashing":false,"pupils":pupils,"offhand":offhand,"limbs":limbs,"feet":feet,"arm":arm,"gun":gun,"tongue":tongue,"color":color,"muzzles":models,"wounds":wounds,"eyewhites":eyewhites,"lids":lids,"fire_light":fire_light,"burning":burning}
+	return {"root":root,"body":body,"closed_mouth":closed_mouth,"open_mouth":open_mouth,"brows":brows,"flash":flash,"skin_meshes":skin_meshes,"flashing":false,"pupils":pupils,"offhand":offhand,"limbs":limbs,"feet":feet,"arm":arm,"gun":gun,"tongue":tongue,"color":color,"muzzles":models,"wounds":wounds,"eyewhites":eyewhites,"lids":lids,"fire_light":fire_light,"burning":burning,"girth":girth}
+
+func dress_frog(body:Node3D,character:String,color:Color)->void:
+	match character:
+		"pirate":
+			# Patch over the left eye, strap around the head, red bandana with a knot.
+			ball(body,Vector3(-.28,.56,.33),Vector3(.18,.2,.07),Color("1d1a18"))
+			tube(body,Vector3(-.45,.66,.27),Vector3(-.1,.47,.37),.022,Color("1d1a18"))
+			tube(body,Vector3(-.1,.47,.37),Vector3(.5,.5,.12),.02,Color("1d1a18"))
+			ball(body,Vector3(0,.6,-.02),Vector3(.36,.2,.3),Color("c83a32"))
+			for i in 4:ball(body,Vector3(-.15+i*.1,.68-absf(i-1.5)*.03,.2),Vector3(.03,.03,.02),Color("f4e6cf"))
+			ball(body,Vector3(.5,.45,-.12),Vector3(.09,.07,.07),Color("c83a32"))
+			for side in [-1,1]:
+				var tail:=ball(body,Vector3(.62,.38+side*.05,-.16),Vector3(.13,.045,.05),Color("b23029"));tail.rotation.z=-.5+side*.35
+			ball(body,Vector3(.5,.14,.3),Vector3(.025,.08,.02),color.darkened(.45)).rotation.z=.4 # cheek scar
+		"chonk":
+			# Wide belly, a double chin, rosy cheeks and a tuft on top.
+			ball(body,Vector3(0,.07,.31),Vector3(.33,.1,.12),color.lightened(.06))
+			for side in [-1,1]:ball(body,Vector3(side*.4,.25,.27),Vector3(.08,.05,.04),Color("ec7f86"))
+			for i in 3:ball(body,Vector3(-.04+i*.04,.6+i*.03,.12),Vector3(.025,.08,.025),color.darkened(.2)).rotation.z=.5-i*.5
+			ball(body,Vector3(0,-.14,.5),Vector3(.04,.03,.012),color.darkened(.4)) # belly button
+		"grandpa":
+			# Round glasses, bushy white brows, a walrus moustache and age spots.
+			var rim:=Color("c9a25a")
+			for side in [-1,1]:
+				var ring:=TorusMesh.new();ring.inner_radius=.15;ring.outer_radius=.18;ring.rings=24;ring.ring_segments=8
+				var lens:=mesh(body,ring,Vector3(side*.28,.55,.37),Vector3.ONE,material(rim));lens.rotation.x=PI*.5
+				for i in 3:ball(body,Vector3(side*(.2+i*.08),.76+i*.02,.27),Vector3(.075,.05,.06),Color("f2efe8"))
+				var tuft:=ball(body,Vector3(side*.13,.26,.37),Vector3(.15,.065,.07),Color("f2efe8"));tuft.rotation.z=side*-.35
+				ball(body,Vector3(side*.24,.21,.36),Vector3(.06,.08,.05),Color("f2efe8"))
+			tube(body,Vector3(-.12,.55,.39),Vector3(.12,.55,.39),.018,rim)
+			for spot in [Vector3(.08,.47,.3),Vector3(-.16,.43,.3),Vector3(.22,.36,.31)]:ball(body,spot,Vector3(.035,.028,.02),color.darkened(.28))
+		"rocker":
+			# A pink punk crest fanning out between the eyes.
+			var hair:=Color("e2559b")
+			for i in 5:
+				var angle:float=-.7+i*.35
+				var spike:=ball(body,Vector3(sin(angle)*.2,.66+cos(angle)*.2,.06),Vector3(.065,.2-absf(angle)*.06,.08),hair.lightened(.12 if i%2 else 0.0))
+				spike.rotation.z=-angle
+			ball(body,Vector3(0,.56,.04),Vector3(.18,.1,.16),hair.darkened(.12))
+			ball(body,Vector3(.45,.08,.33),Vector3(.045,.045,.045),Color("ecd27a")) # stud
 
 func collect_skin(node:Node3D,out:Array,gun:Node3D)->void:
 	if node==gun:return
@@ -479,7 +526,7 @@ func update()->void:
 			if j>=p.wounds.size():continue
 			var wound:Dictionary=p.wounds[j];var point:Vector2=wound.offset
 			# Project the mark onto the front of the rounded clay torso.
-			var z:float=.30*sqrt(maxf(.14,1-pow(point.x/.56,2)-pow((point.y+.03)/.66,2)))+.095
+			var z:float=(.30*sqrt(maxf(.14,1-pow(point.x/.56,2)-pow((point.y+.03)/.66,2)))+.095)*f.girth
 			f.wounds[j].position=Vector3(point.x,point.y,z);f.wounds[j].scale=Vector3.ONE*wound.size
 		var flashing:bool=p.flash>.12
 		if flashing!=f.flashing:

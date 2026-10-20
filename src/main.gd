@@ -483,7 +483,7 @@ func update_profiles(_seats:Array,players:Array,_presence:Array)->void:
 			if color!=p.color:
 				p.color=color
 				var i:int=sim.frogs.find(p)
-				world.frogs[i].root.queue_free();world.frogs[i]=world.make_frog(Color(color))
+				world.frogs[i].root.queue_free();world.frogs[i]=world.make_frog(Color(color),i)
 			for source in roster:
 				if source.id==p.id:source.name=p.name;source.color=p.color;source.skin_color=p.skin_color;source.avatar=p.avatar
 
