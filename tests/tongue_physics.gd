@@ -70,4 +70,12 @@ func _initialize()->void:
 	for i in range(720):
 		s.step(1.0/120,[{"tongue":true}]);drift=maxf(drift,maxf(absf(p.pos.x),absf(b.pos.x)))
 	check(drift<.01,"A motionless frog and hanging platform do not develop lateral drift")
+	# Pressing jump again in mid-air fires the tongue for as long as jump is held.
+	s=pair();p=s.frogs[0];p.anchor={};p.tongue_prev=false;p.pos=Vector2(0,8);p.vel=Vector2.ZERO;p.ground=-1;p.coyote=0.0
+	s.step(1.0/120,[{"jump":true,"aim":Vector2(0,1)}])
+	check(not p.anchor.is_empty() and p.jump_tongue,"Mid-air jump press grabs with the tongue")
+	for i in range(30):s.step(1.0/120,[{"jump":true,"aim":Vector2(0,1)}])
+	check(not p.anchor.is_empty(),"Holding jump keeps the tongue attached")
+	s.step(1.0/120,[{"aim":Vector2(0,1)}])
+	check(p.anchor.is_empty() and not p.jump_tongue,"Releasing jump lets go of the tongue")
 	print("Frog Fighter tongue physics: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)

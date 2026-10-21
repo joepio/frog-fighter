@@ -96,8 +96,14 @@ func run()->void:
 	game.set_arena("cycle");game.start_local()
 	var toured:Array=[game.sim.arena_id]
 	for i in range(game.Simulation.Arenas.IDS.size()-1):game.new_round();toured.append(game.sim.arena_id)
-	check(toured==game.Simulation.Arenas.IDS,"Tour plays each arena once before repeating")
-	game.new_round();check(game.sim.arena_id=="terrarium","Tour wraps after all arenas")
+	var sorted_tour:Array=toured.duplicate();sorted_tour.sort();var sorted_ids:Array=game.Simulation.Arenas.IDS.duplicate();sorted_ids.sort()
+	check(sorted_tour==sorted_ids,"Random rotation plays each arena once before repeating")
+	var last:String=game.sim.arena_id;var repeats:=0
+	for i in range(40):
+		game.new_round()
+		if game.sim.arena_id==last:repeats+=1
+		last=game.sim.arena_id
+	check(repeats==0,"Random rotation never repeats an arena in consecutive rounds")
 	# Portrait decoding must preserve independent profile IDs and transparency.
 	game.hud.portraits.clear()
 	game.sim.frogs[0].skin_color="#aa8866"

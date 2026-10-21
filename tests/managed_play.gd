@@ -40,7 +40,7 @@ func run()->void:
 	game.selected_arena="terrarium"
 	game.round_lives=5 # A standalone saved preference differs from host defaults.
 	await game.prepare("solo",SOLO,PLAYERS)
-	check(game.round_lives==3 and game.sim.frogs[0].lives==3,"Managed lives selector starts from host value, not standalone saved preference")
+	check(game.round_lives==1 and game.sim.frogs[0].lives==1,"Managed lives selector starts from host value, not standalone saved preference")
 	check(game.roster.size()==2 and game.roster[1].bot,"Solo versus gets an AI opponent")
 	check(game.roster[0].id=="p1" and game.roster[0].controller=="pad","Host player and input identity are preserved")
 	game.bridge.phase="running";game.start_managed("solo")
@@ -64,7 +64,7 @@ func run()->void:
 	frame(0);tap(8192);tap(32768)
 	check(game.selected_mode=="survival","Mode is controller-editable")
 	tap(8192);tap(32768)
-	check(game.round_lives==4 and game.settings.values.lives==4,"Lives use the shared setting value")
+	check(game.round_lives==2 and game.settings.values.lives==2,"Lives use the shared setting value")
 	check(game.sim==old and old.arena_id=="terrarium" and old.mode=="versus","Paused selections do not replace current match")
 	await capture("-settings")
 	tap(128)
@@ -81,7 +81,7 @@ func run()->void:
 	check(game.hud.menu==null,"New round immediately removes all menu controls")
 	await settle()
 	check(game.sim!=old and not game.in_menu and not game.paused_local and not game.restart_pending,"Map transition finishes and unpauses")
-	check(game.sim.arena_id=="vineway" and game.sim.mode=="survival" and game.sim.frogs[0].lives==4,"New round applies selected map mode and lives")
+	check(game.sim.arena_id=="vineway" and game.sim.mode=="survival" and game.sim.frogs[0].lives==2,"New round applies selected map mode and lives")
 	check(game.roster.size()==1 and game.roster[0].controller=="pad","Survival removes only generated solo opponent and keeps host identity")
 	await capture("-new-round")
 	for i in 3:

@@ -69,7 +69,7 @@ Choose **Level** in the same menu with left/right:
 - **Last Leaf:** a 20×11 autumn gap with a collapsing bridge, an upper swing and dangerous open sides.
 - **Matchbox:** an 18×12 brawl around wooden walls and a supported roof; flames and grenades open new routes.
 - **Box Pillars:** two stone plinths with ten loose, cross-braced boxes. Shoot or grapple boxes out of their towers; the railgun and grenade launcher start on top. Stone bases can also be destroyed. Falling is lethal.
-- **Tour:** rotate through all fifteen arenas after each match (not between survival waves).
+- **Random** (default): a different random arena every round. Each arena plays once before any repeats, never the same one twice in a row (not between survival waves).
 
 Every arena supports versus and survival and has four safe starting positions
 with nearby weapon pickups; some supports can be destroyed during the fight. The original four keep their safe ponds and walls;
@@ -97,6 +97,7 @@ For a direct source launch, add `-- --arena=vineway` (or `canopy`, `floodplain`,
 |---|---|---|
 | Move / steer a swing | Left stick | A / D |
 | Jump (hold for height) | LB (A also works) | Space |
+| Tongue in mid-air, held while jump is held | Press LB / A again | Space again |
 | Drop through a platform | Left stick down + LB / A | S + Space |
 | Aim weapon and tongue | Right stick | Mouse |
 | Shoot | RT / RB | Left click / F |
@@ -140,7 +141,7 @@ when released. Controllers provide independent aiming for every player.
 
 ## Rules
 
-- **Versus:** selectable 1, 3, or 5 lives per frog (default 3). Losing all health
+- **Versus:** selectable 1, 3, or 5 lives per frog (default 1). Losing all health
   costs one life. The pond is safe: frogs float and can move, fire, grapple, or
   jump out. Foreground rocks have solid landing crowns and support jumps. Surviving frogs win after the other players are eliminated.
 - **Survival:** starts with eight bees in solo play, with larger groups for extra

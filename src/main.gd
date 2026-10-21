@@ -15,10 +15,10 @@ var in_menu:=true
 var paused_local:=false
 var human_count:=1
 var bot_count:=3
-var round_lives:=3
+var round_lives:=1
 var fullscreen:=false
 var selected_mode:="versus"
-var selected_arena:="terrarium"
+var selected_arena:="cycle"
 var arena_round:=0
 var best_wave:=0
 var next_round:=1
@@ -94,11 +94,11 @@ func load_settings()->void:
 		human_count=clampi(int(config.get_value("play","players",1)),1,4)
 		selected_mode=str(config.get_value("play","mode","versus"))
 		if selected_mode not in ["versus","survival"]:selected_mode="versus"
-		selected_arena=str(config.get_value("play","arena","terrarium"))
-		if selected_arena not in Simulation.Arenas.IDS+["cycle"]:selected_arena="terrarium"
+		selected_arena=str(config.get_value("play","arena","cycle"))
+		if selected_arena not in Simulation.Arenas.IDS+["cycle"]:selected_arena="cycle"
 		bot_count=clampi(int(config.get_value("play","bots",3)),0,4-human_count)
-		round_lives=int(config.get_value("play","lives",3))
-		if round_lives not in [1,3,5]:round_lives=3
+		round_lives=int(config.get_value("play","lives",1))
+		if round_lives not in [1,3,5]:round_lives=1
 		fullscreen=bool(config.get_value("play","fullscreen",false))
 	validate_players()
 
@@ -170,7 +170,17 @@ func start_local()->void:
 	hud.hide_menu();new_round();save_settings();back_release=0
 
 func round_arena()->String:
-	return Simulation.Arenas.IDS[arena_round%Simulation.Arenas.IDS.size()] if selected_arena=="cycle" else selected_arena
+	return random_arena(arena_round) if selected_arena=="cycle" else selected_arena
+
+# Random rotation: every arena once per shuffled pass, never the same one twice in a row.
+var arena_bag:Array=[]
+func random_arena(index:int)->String:
+	var ids:Array=Simulation.Arenas.IDS
+	while arena_bag.size()<=index:
+		var pass_order:Array=ids.duplicate();pass_order.shuffle()
+		if not arena_bag.is_empty() and pass_order[0]==arena_bag[-1]:pass_order.push_back(pass_order.pop_front())
+		arena_bag.append_array(pass_order)
+	return arena_bag[index]
 
 func round_key(players:Array)->String:
 	return JSON.stringify([round_arena(),selected_mode,next_round,round_lives,players])

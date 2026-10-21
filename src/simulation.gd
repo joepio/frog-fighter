@@ -143,7 +143,7 @@ func _init(roster: Array = [], game_mode: String = "versus", seed_value: int = 1
 		var p: Dictionary = roster[i].duplicate(true)
 		p.merge({"pos":spawns[i%4],"spawn":spawns[i%4],"vel":Vector2.ZERO,"aim":Vector2.RIGHT,
 			"hp":100.0,"lives":3,"alive":true,"respawn":0.0,"invincible":2.0,
-			"ground":-1,"in_water":false,"drop_platform":-1,"drop_time":0.0,"coyote":0.0,"wall_release":0.0,"wall_air":0.0,"jump_buffer":0.0,"jump_prev":false,"tongue_prev":false,
+			"ground":-1,"in_water":false,"drop_platform":-1,"drop_time":0.0,"coyote":0.0,"wall_release":0.0,"wall_air":0.0,"jump_buffer":0.0,"jump_prev":false,"jump_tongue":false,"tongue_prev":false,
 			"throw_prev":false,"pending_burr":{},"pickup_delay":0.0,"enemy_guard":0.0,"anchor":{},"rope":0.0,"weapon":"","ammo":0,
 			"tongue_active":false,"tongue_miss":0.0,"tongue_direction":Vector2.RIGHT,"trigger_held":false,"stride":0.0,"walk":0.0,"wounds":[],"burn":0.0,"shot_age":10.0,"last_weapon":"","last_volley":-1,"hit_dir":Vector2.RIGHT,"cooldown":0.0,"stuck":false,"facing":1.0,"flash":0.0,
 			"name":"Frog %d"%(i+1),"color":COLORS[i%4],"slot":i,"bot":false},false)
@@ -373,6 +373,11 @@ func update_frog(p:Dictionary,c:Dictionary,dt:float)->void:
 		p.vel.x+=move.x*26*dt
 	else:
 		p.vel.x=move_toward(p.vel.x,move.x*RUN_SPEED*run_speed,(60 if p.ground>=0 else (55 if p.wall_air>0 else AIR_ACCELERATION))*dt)
+	# A second jump press in mid-air fires the tongue for as long as jump is held.
+	if jump and not p.jump_prev and not p.get("bot",false) and p.ground<0 and p.coyote<=0 and not p.stuck and not was_stuck and p.anchor.is_empty():
+		p.jump_tongue=true;p.jump_buffer=0.0
+	if not jump:p.jump_tongue=false
+	if p.jump_tongue:tongue=true;p.tongue_active=true
 	if p.jump_buffer>0 and (p.coyote>0 or p.stuck or was_stuck or not p.anchor.is_empty()):
 		var launch:=Vector2.ZERO
 		if p.ground>=0 and Physics.dynamic(platforms[p.ground]):
@@ -386,7 +391,7 @@ func update_frog(p:Dictionary,c:Dictionary,dt:float)->void:
 			p.wall_release=.10;p.wall_air=.40
 		p.stuck=false;p.ground=-1;p.coyote=0.0;p.jump_buffer=0.0;p.anchor={}
 		burst(p.pos,Color(p.color),5);events.append("jump")
-	if not jump and p.jump_prev and p.vel.y>5: p.vel.y*=.48
+	if not jump and p.jump_prev and p.vel.y>5 and p.anchor.is_empty(): p.vel.y*=.48
 	if tongue and not p.tongue_prev:
 		p.anchor=cast_tongue(p.pos,p.aim)
 		p.tongue_direction=p.aim

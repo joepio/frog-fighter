@@ -110,7 +110,7 @@ func draw_controls(origin:Vector2)->void:
 	var rows:Array=[
 		[["LS"],"Move, climb, reel tongue"],
 		[["RS"],"Aim weapon and tongue"],
-		[["LB","A"],"Jump, hold for height"],
+		[["LB","A"],"Jump, again in the air: tongue"],
 		[["RT","RB"],"Shoot"],
 		[["LT"],"Tongue grapple, hold"],
 		[["X"],"Throw weapon"],

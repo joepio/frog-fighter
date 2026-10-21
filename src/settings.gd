@@ -15,14 +15,14 @@ var SPECS = [
     "key": "arena",
     "label": "Arena (next round)",
     "kind": "choice",
-    "default": "terrarium",
+    "default": "cycle",
     "options": preload("res://src/arenas.gd").IDS + ["cycle"]
   },
   {
     "key": "lives",
     "label": "Lives (next round)",
     "kind": "number",
-    "default": 3,
+    "default": 1,
     "min": 1,
     "max": 9
   },
