@@ -441,7 +441,8 @@ func prepare(session:String,seats:Array,players:Array)->void:
 	# Local saved lives must not override the host's shared match setting in UI.
 	round_lives=int(settings.values.lives)
 	var used_tokens:Dictionary={}
-	for seat in seats:
+	# Frogs follow where players sit on the couch, left to right.
+	for seat in Bridge.couch_order(seats,players):
 		var occupant:Dictionary=seat.get("occupant",{})
 		if occupant.get("kind","empty")=="empty" or roster.size()>=4:continue
 		var slot:int=int(seat.get("index",roster.size()))
