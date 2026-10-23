@@ -63,21 +63,29 @@ static func step(sim:RefCounted,dt:float)->void:
 			b.vel.y-=22*sub;b.vel*=exp(-.12*sub);b.omega*=exp(-.35*sub)
 			b.pos+=b.vel*sub;b.angle=wrapf(b.angle+b.omega*sub,-PI,PI)
 		var pairs:Array=[]
+		var bounds:Array=[];var order:Array=[]
+		for b in solids:
+			var bh:=half(b);var c:float=absf(cos(b.angle));var s:float=absf(sin(b.angle))
+			bounds.append(Vector2(c*bh.x+s*bh.y,s*bh.x+c*bh.y)+Vector2(.15,.15))
+			order.append(moving.find(b) if dynamic(b) and not b.get("sleeping",false) else -1)
 		for i in range(moving.size()):
 			var a:Dictionary=moving[i]
-			var ah:=half(a)
-			var bounds_a:=Vector2(absf(cos(a.angle))*ah.x+absf(sin(a.angle))*ah.y,absf(sin(a.angle))*ah.x+absf(cos(a.angle))*ah.y)
-			for b in solids:
-				if is_same(a,b):continue
-				if dynamic(b) and not b.get("sleeping",false) and moving.find(b)<=i:continue
-				var bh:=half(b)
-				var bounds_b:=Vector2(absf(cos(b.angle))*bh.x+absf(sin(b.angle))*bh.y,absf(sin(b.angle))*bh.x+absf(cos(b.angle))*bh.y)
+			var ah:=half(a);var c:float=absf(cos(a.angle));var s:float=absf(sin(a.angle))
+			var bounds_a:=Vector2(c*ah.x+s*ah.y,s*ah.x+c*ah.y)
+			for k in range(solids.size()):
+				if order[k]>=0 and order[k]<=i:continue
+				var b:Dictionary=solids[k]
 				var distance:Vector2=(a.pos-b.pos).abs()
-				if distance.x<bounds_a.x+bounds_b.x+.15 and distance.y<bounds_a.y+bounds_b.y+.15:pairs.append([a,b])
+				if distance.x<bounds_a.x+bounds[k].x and distance.y<bounds_a.y+bounds[k].y:pairs.append([a,b])
+		# Contact geometry (SAT and clipping) is the expensive part; build it once
+		# per substep and let the iterations only exchange impulses.
+		var manifolds:Array=[]
+		for pair in pairs:manifolds.append(contact_manifold(pair[0],pair[1]))
 		for iteration in range(ITERATIONS):
 			for b in moving:
 				for rope in b.ropes:solve_rope(b,rope,sub)
-			for pair in pairs:solve_contact(pair[0],pair[1])
+			for k in range(pairs.size()):
+				if not manifolds[k].is_empty():solve_manifold(pairs[k][0],pairs[k][1],manifolds[k])
 		for b in moving:
 			if sim.walls:
 				var extent:float=absf(cos(b.angle))*b.width*.5+absf(sin(b.angle))*b.height*.5
@@ -91,7 +99,15 @@ static func step(sim:RefCounted,dt:float)->void:
 	for b in moving:
 		if b.kind=="loose" and (b.pos.y<sim.kill_y-5 or absf(b.pos.x)>sim.half_width+5):
 			b.active=false;b.restore=10.0
-	var resting:bool=loose.all(func(b):return b.vel.length()<.06 and absf(b.omega)<.08)
+	# Stacks jitter a little forever, so judge rest by net movement since the
+	# body last moved, not only by instantaneous speed; otherwise a standing
+	# tower never sleeps and keeps the solver busy all round.
+	var resting:=true
+	for b in loose:
+		var anchor:Vector3=b.get("rest_anchor",Vector3(b.pos.x,b.pos.y,b.angle))
+		if b.vel.length()>.5 or absf(b.omega)>.4 or Vector2(anchor.x,anchor.y).distance_to(b.pos)>.04 or absf(anchor.z-b.angle)>.03:
+			anchor=Vector3(b.pos.x,b.pos.y,b.angle);resting=false
+		b["rest_anchor"]=anchor
 	for b in loose:
 		b["rest_time"]=b.get("rest_time",0.0)+dt if resting else 0.0
 		if b.rest_time>.8:b["sleeping"]=true;b.vel=Vector2.ZERO;b.omega=0.0
@@ -128,6 +144,10 @@ static func corners(body:Dictionary)->Array:
 	return out
 
 static func solve_contact(a:Dictionary,b:Dictionary)->void:
+	var m:=contact_manifold(a,b)
+	if not m.is_empty():solve_manifold(a,b,m)
+
+static func contact_manifold(a:Dictionary,b:Dictionary)->Dictionary:
 	var av:=corners(a);var bv:=corners(b)
 	var normal:=Vector2.ZERO;var overlap:=INF
 	for angle in [a.angle,b.angle]:
@@ -136,12 +156,11 @@ static func solve_contact(a:Dictionary,b:Dictionary)->void:
 			for v in av:amin=minf(amin,v.dot(axis));amax=maxf(amax,v.dot(axis))
 			for v in bv:bmin=minf(bmin,v.dot(axis));bmax=maxf(bmax,v.dot(axis))
 			var depth:float=minf(amax,bmax)-maxf(amin,bmin)
-			if depth<=0:return
+			if depth<=0:return {}
 			if depth<overlap:overlap=depth;normal=axis if (b.pos-a.pos).dot(axis)>0 else -axis
 	if b.get("sleeping",false):b.sleeping=false;b.rest_time=0.0
 	var ia:float=a.get("inv_mass",0.0);var ib:float=b.get("inv_mass",0.0)
-	var sum:float=ia+ib
-	if sum<=0:return
+	if ia+ib<=0:return {}
 	# Clip the two convex rectangles to obtain a two-point contact manifold.
 	var polygon:Array=av
 	for edge in range(4):
@@ -155,25 +174,46 @@ static func solve_contact(a:Dictionary,b:Dictionary)->void:
 			if distance>=0:output.append(current)
 			previous=current;prior=distance
 		polygon=output
-	if polygon.is_empty():return
+	if polygon.is_empty():return {}
 	var tangent:=Vector2(-normal.y,normal.x)
 	var low:Vector2=polygon[0];var high:Vector2=polygon[0]
 	for v in polygon:
 		if v.dot(tangent)<low.dot(tangent):low=v
 		if v.dot(tangent)>high.dot(tangent):high=v
+	# Arms and effective masses barely change within one substep: cache them.
+	var ja:float=a.get("inv_inertia",0.0);var jb:float=b.get("inv_inertia",0.0)
+	var contacts:Array=[]
 	for point in [low,high]:
 		var ra:Vector2=point-a.pos;var rb:Vector2=point-b.pos
-		var relative:Vector2=velocity(b,point)-velocity(a,point)
+		var normal_mass:float=1.0/(ia+ib+pow(ra.cross(normal),2)*ja+pow(rb.cross(normal),2)*jb)
+		var tangent_mass:float=1.0/(ia+ib+pow(ra.cross(tangent),2)*ja+pow(rb.cross(tangent),2)*jb)
+		contacts.append([ra,rb,normal_mass,tangent_mass])
+	return {"normal":normal,"overlap":overlap,"contacts":contacts,"ia":ia,"ib":ib,"ja":ja,"jb":jb}
+
+static func solve_manifold(a:Dictionary,b:Dictionary,m:Dictionary)->void:
+	var ia:float=m.ia;var ib:float=m.ib;var ja:float=m.ja;var jb:float=m.jb
+	var sum:float=ia+ib
+	var normal:Vector2=m.normal;var tangent:=Vector2(-normal.y,normal.x)
+	var va:Vector2=a.vel;var wa:float=a.get("omega",0.0)
+	var vb:Vector2=b.get("vel",Vector2.ZERO);var wb:float=b.get("omega",0.0)
+	for c in m.contacts:
+		var ra:Vector2=c[0];var rb:Vector2=c[1]
+		var relative:Vector2=vb+Vector2(-rb.y,rb.x)*wb-va-Vector2(-ra.y,ra.x)*wa
 		var speed:float=relative.dot(normal)
 		if speed>=0:continue
-		var inertia_a:float=a.get("inv_inertia",0.0);var inertia_b:float=b.get("inv_inertia",0.0)
-		var effective:float=sum+pow(ra.cross(normal),2)*inertia_a+pow(rb.cross(normal),2)*inertia_b
-		var j:float=-speed*(1.15 if speed< -2 else 1.0)/effective
-		impulse(a,-normal*j,point,false);impulse(b,normal*j,point,false)
-		relative=velocity(b,point)-velocity(a,point)
-		var friction:float=clampf(-relative.dot(tangent)/(sum+pow(ra.cross(tangent),2)*inertia_a+pow(rb.cross(tangent),2)*inertia_b),-j*.65,j*.65)
-		impulse(a,-tangent*friction,point,false);impulse(b,tangent*friction,point,false)
-	var correction:Vector2=normal*maxf(0,overlap-.003)*.55/sum
+		var j:float=-speed*(1.15 if speed< -2 else 1.0)*c[2]
+		var push:Vector2=normal*j
+		va-=push*ia;wa-=ra.cross(push)*ja;vb+=push*ib;wb+=rb.cross(push)*jb
+		relative=vb+Vector2(-rb.y,rb.x)*wb-va-Vector2(-ra.y,ra.x)*wa
+		var friction:float=clampf(-relative.dot(tangent)*c[3],-j*.65,j*.65)
+		var slide:Vector2=tangent*friction
+		va-=slide*ia;wa-=ra.cross(slide)*ja;vb+=slide*ib;wb+=rb.cross(slide)*jb
+	if dynamic(a):a.vel=va.limit_length(25);a.omega=clampf(wa,-12,12)
+	if dynamic(b):b.vel=vb.limit_length(25);b.omega=clampf(wb,-12,12)
+	# Each pass removes 55% of the overlap that remains, as a fresh SAT would.
+	var depth_push:float=maxf(0,m.overlap-.003)*.55
+	m.overlap-=depth_push
+	var correction:Vector2=normal*depth_push/sum
 	a.pos-=correction*ia;b.pos+=correction*ib
 
 static func circle(body:Dictionary,position:Vector2,radius:float)->Dictionary:

@@ -4,6 +4,7 @@ const Simulation=preload("res://src/simulation.gd")
 const World=preload("res://src/world.gd")
 const Hud=preload("res://src/hud.gd")
 const Bridge=preload("res://src/bridge.gd")
+const FxWarmup=preload("res://src/fx_warmup.gd")
 var settings = preload("res://src/settings.gd").new()
 var sim:RefCounted
 var world:Node3D
@@ -205,6 +206,7 @@ func prepare_next_round()->void:
 	add_child(viewport)
 	var preview:=World.new();viewport.add_child(preview);preview.sim=pending_sim
 	await preview.build_stage(true)
+	if generation==preparation_generation and DisplayServer.get_name()!="headless":await FxWarmup.warm_stage(viewport)
 	preparing=false
 	if generation!=preparation_generation:
 		viewport.queue_free();return
