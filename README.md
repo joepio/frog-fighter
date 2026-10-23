@@ -38,8 +38,8 @@ or a source of finished 3D assets.
 Open `FrogFighter.exe` in the portable Windows build, or open `project.godot` in
 Godot 4.5.2 and press F5. The game is fully local and works offline.
 
-One start screen contains mode, 1–4 human players, bot count, 1/3/5 lives,
-level, and window/fullscreen options. Fifty short sound variations cover movement,
+One start screen contains mode, 1–4 human players, bot count, 1/3/5 lives
+(default 1) and window/fullscreen options. Fifty short sound variations cover movement,
 weapons and impacts, with bounded voices and per-cue cooldowns. Press **Play** or controller
 Start to play. Up/down selects a row; left/right immediately cycles its value.
 The stick, D-pad, and arrow keys all work. The active row is bright lime.
@@ -47,12 +47,13 @@ A/Enter is only needed for Play, Resume, or New match; Start is a shortcut.
 F2 cycles player count; F3/controller Y switches mode. F11 toggles fullscreen.
 Start, Escape, or Back opens this same settings menu during a match.
 Resume (or Start/Escape/Back again) continues the paused match. New match applies
-the selected mode, player/bot counts, lives, and level. Display changes apply immediately.
+the selected mode, player/bot counts and lives. Display changes apply immediately.
 Versus requires at least two frogs; survival uses only the selected human team.
 
 ### Levels
 
-Choose **Level** in the same menu with left/right:
+Every round picks a random arena. Each arena plays once before any repeats, and
+never twice in a row. There is no arena choice in the menu:
 
 - **Terrarium:** the original seesaw, timber shelves, and hanging platforms.
 - **Vineway:** a wide open middle, three swinging perches, and five hanging vine grips for crossing long gaps.
@@ -69,7 +70,6 @@ Choose **Level** in the same menu with left/right:
 - **Last Leaf:** a 20×11 autumn gap with a collapsing bridge, an upper swing and dangerous open sides.
 - **Matchbox:** an 18×12 brawl around wooden walls and a supported roof; flames and grenades open new routes.
 - **Box Pillars:** two stone plinths with ten loose, cross-braced boxes. Shoot or grapple boxes out of their towers; the railgun and grenade launcher start on top. Stone bases can also be destroyed. Falling is lethal.
-- **Random** (default): a different random arena every round. Each arena plays once before any repeats, never the same one twice in a row (not between survival waves).
 
 Every arena supports versus and survival and has four safe starting positions
 with nearby weapon pickups; some supports can be destroyed during the fight. The original four keep their safe ponds and walls;
@@ -88,8 +88,8 @@ The new maps each start with nine deliberately placed pickups, including all
 seven weapon types; empty supply sites replenish, and broken sites wait to recover.
 Aim your tongue at the pale green curls on hanging vines to attach and swing;
 reel in with up, then jump to release. Upper perches offer alternative routes
-across the open middle. The level choice is saved with the other settings.
-For a direct source launch, add `-- --arena=vineway` (or `canopy`, `floodplain`, `cycle`).
+across the open middle.
+For testing one arena from source, add `-- --arena=vineway` (or `canopy`, `floodplain`).
 
 ### Controls
 
@@ -242,9 +242,9 @@ simulation for frame-by-frame inspection. It is excluded from playable exports.
 ## GameNight integration
 
 During managed play, controller **Start** opens a pause menu with Resume,
-Map, Mode, Lives, Start new round and Back to Game Room. Use the D-pad or left
+Start new round, Mode, Lives and Back to Game Room. Use the D-pad or left
 stick up/down to select, left/right to change, and A to confirm. Resume keeps
-the current match; the three settings apply when starting a new round. Selected
+the current match; the two settings apply when starting a new round. Selected
 maps prepare in the background while paused, with a brief preparing screen if
 needed. It uses GameNight's controller frames and keeps the host's player
 assignments. A solo versus session receives one AI

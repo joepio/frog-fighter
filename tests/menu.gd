@@ -85,14 +85,9 @@ func run()->void:
 	game.bridge.launched_by_daemon=false
 	var a:Vector2=game.world.screen_point(Vector2(-5,5));var b:Vector2=game.world.screen_point(Vector2(5,5))
 	check(b.x>a.x,"Camera keeps rightward movement screen-right")
-	game.show_menu();game.set_arena("terrarium");game.hud.menu_row=5
-	game.hud.menu_move(Vector2i.RIGHT)
-	check(game.selected_arena=="vineway","Level row cycles directly with right")
-	game.load_settings();check(game.selected_arena=="vineway","Arena selection is saved")
-	game.start_local();check(game.sim.arena_id=="vineway","Play loads the selected level")
-	game.toggle_menu();original=game.sim;game.set_arena("canopy");game.resume_local()
-	check(game.sim==original and game.sim.arena_id=="vineway","Changing level while paused preserves the match on Resume")
-	game.start_local();check(game.sim.arena_id=="canopy","New match applies the selected level")
+	game.show_menu()
+	check(not game.hud.menu.get_children().any(func(item):return item.get_meta("menu_key","")=="arena"),"Menu has no map choice: arenas are always random")
+	game.load_settings();check(game.selected_arena=="cycle","Saved settings keep the random arena rotation")
 	game.set_arena("cycle");game.start_local()
 	var toured:Array=[game.sim.arena_id]
 	for i in range(game.Simulation.Arenas.IDS.size()-1):game.new_round();toured.append(game.sim.arena_id)

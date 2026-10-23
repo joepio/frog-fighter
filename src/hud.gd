@@ -35,7 +35,7 @@ func _draw()->void:
 	var s:RefCounted=game.sim
 	if game.restart_pending:
 		panel(Rect2(480,360,640,150),Color(.045,.09,.065,.96),22)
-		centered("Preparing "+game.Simulation.Arenas.NAMES[game.selected_arena],Vector2(800,422),30,CREAM,bold)
+		centered("Preparing "+game.Simulation.Arenas.NAMES[game.round_arena()],Vector2(800,422),30,CREAM,bold)
 		centered("Your next round is almost ready",Vector2(800,465),18,MUTED)
 		return
 	if game.in_menu:
@@ -44,7 +44,7 @@ func _draw()->void:
 			draw_game_logo(Rect2(310, 151, 480, 90))
 			draw_controls(Vector2(880,140))
 			return
-		panel(Rect2(70,95,500,165+(action_rows()+6)*58),Color(.045,.09,.065,.96),22)
+		panel(Rect2(70,95,500,165+(action_rows()+5)*58),Color(.045,.09,.065,.96),22)
 		draw_game_logo(Rect2(106, 108, 430, 95))
 		draw_controls(Vector2(600,95))
 		return
@@ -141,11 +141,11 @@ func row_enabled(row:int)->bool:
 func menu_move(direction:Vector2i)->void:
 	if not game.in_menu:return
 	if game.bridge.launched_by_daemon:
-		if direction.y!=0:menu_row=posmod(menu_row+direction.y,6);make_menu()
+		if direction.y!=0:menu_row=posmod(menu_row+direction.y,5);make_menu()
 		elif direction.x!=0:game.managed_menu_change(menu_row,direction.x)
 		return
 	if direction.y!=0:
-		var count:int=action_rows()+6
+		var count:int=action_rows()+5
 		menu_row=posmod(menu_row+direction.y,count)
 		if not row_enabled(menu_row):menu_row=posmod(menu_row+direction.y,count)
 		make_menu()
@@ -161,10 +161,7 @@ func cycle_value(direction:int)->void:
 			var count:int=5-game.human_count-minimum
 			game.set_bots(minimum+posmod(game.bot_count-minimum+direction,count))
 		3:game.set_lives([1,3,5][posmod([1,3,5].find(game.round_lives)+direction,3)])
-		4:
-			var arenas:Array=game.Simulation.Arenas.IDS+["cycle"]
-			game.set_arena(arenas[posmod(arenas.find(game.selected_arena)+direction,arenas.size())])
-		5:game.set_fullscreen(not game.fullscreen)
+		4:game.set_fullscreen(not game.fullscreen)
 
 func activate_row(row:int)->void:
 	if not game.in_menu:return
@@ -222,12 +219,12 @@ func make_menu()->void:
 	if is_instance_valid(menu):remove_child(menu);menu.queue_free()
 	menu=Control.new();menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);menu.mouse_filter=Control.MOUSE_FILTER_IGNORE;add_child(menu)
 	if game.bridge.launched_by_daemon:
-		menu_row=clampi(menu_row,0,5)
-		var labels:Array=["Resume","Start new round","Map","Mode","Lives","Back to Game Room"]
-		var values:Array=["","",game.Simulation.Arenas.NAMES[game.selected_arena],game.selected_mode.capitalize(),str(game.round_lives),""]
-		for row in 6:
+		menu_row=clampi(menu_row,0,4)
+		var labels:Array=["Resume","Start new round","Mode","Lives","Back to Game Room"]
+		var values:Array=["","",game.selected_mode.capitalize(),str(game.round_lives),""]
+		for row in 5:
 			var button:=Button.new();button.position=Vector2(285,256+row*64);button.size=Vector2(530,55)
-			button.set_meta("menu_key",["resume","restart","arena","mode","lives","lobby"][row])
+			button.set_meta("menu_key",["resume","restart","mode","lives","lobby"][row])
 			button.text=labels[row]+("    ‹  "+values[row]+"  ›" if not values[row].is_empty() else "")
 			button.focus_mode=Control.FOCUS_NONE
 			button.add_theme_font_override("font",bold);button.add_theme_font_size_override("font_size",24)
@@ -237,14 +234,14 @@ func make_menu()->void:
 			button.pressed.connect(func():activate_row(row));menu.add_child(button)
 		queue_redraw()
 		return
-	menu_row=clampi(menu_row,0,action_rows()+5)
+	menu_row=clampi(menu_row,0,action_rows()+4)
 	if not row_enabled(menu_row):menu_row=action_rows()+3
 	var labels:Array=["Resume","New match"] if game.paused_local else ["Play"]
 	var values:Array=["",""] if game.paused_local else [""]
 	var keys:Array=["start","restart"] if game.paused_local else ["start"]
-	labels.append_array(["Mode","Players","Bots","Lives","Level","Display"])
-	values.append_array([game.selected_mode.capitalize(),str(game.human_count),str(game.bot_count) if game.selected_mode=="versus" else "—",str(game.round_lives),game.Simulation.Arenas.NAMES[game.selected_arena],"Full screen" if game.fullscreen else "Window"])
-	keys.append_array(["mode","players","bots","lives","arena","display"])
+	labels.append_array(["Mode","Players","Bots","Lives","Display"])
+	values.append_array([game.selected_mode.capitalize(),str(game.human_count),str(game.bot_count) if game.selected_mode=="versus" else "—",str(game.round_lives),"Full screen" if game.fullscreen else "Window"])
+	keys.append_array(["mode","players","bots","lives","display"])
 	for row in range(labels.size()):
 		var selected:bool=row==menu_row
 		var enabled:bool=row_enabled(row)

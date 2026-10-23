@@ -12,14 +12,7 @@ var SPECS = [
     ]
   },
   {
-    "key": "arena",
-    "label": "Arena (next round)",
-    "kind": "choice",
-    "default": "cycle",
-    "options": preload("res://src/arenas.gd").IDS + ["cycle"]
-  },
-  {
-    "key": "lives",
+    "key": "start_lives",
     "label": "Lives (next round)",
     "kind": "number",
     "default": 1,

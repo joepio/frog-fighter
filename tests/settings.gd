@@ -47,7 +47,7 @@ func run() -> void:
 	settings.change("damage",150);settings.apply_live(b)
 	b.hurt(p,20,Vector2.ZERO)
 	check(p.hp==70,"Damage multiplier reaches combat")
-	settings.change("lives",7);settings.apply_live(b)
+	settings.change("start_lives",7);settings.apply_live(b)
 	check(p.lives==3,"Lives are not reset mid-round")
 	settings.change("gravity",25);settings.apply_live(b)
 	a.frogs[0].vel=Vector2.ZERO;b.frogs[0].vel=Vector2.ZERO

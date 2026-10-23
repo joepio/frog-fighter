@@ -83,8 +83,7 @@ func _ready()->void:
 func setting_changed(key:String,value:Variant)->void:
 	if not settings.change(key,value):return
 	if key=="mode":selected_mode=value
-	elif key=="arena":selected_arena=value
-	elif key=="lives":round_lives=int(value)
+	elif key=="start_lives":round_lives=int(value)
 	if sim!=null:settings.apply_live(sim)
 
 func load_settings()->void:
@@ -94,8 +93,6 @@ func load_settings()->void:
 		human_count=clampi(int(config.get_value("play","players",1)),1,4)
 		selected_mode=str(config.get_value("play","mode","versus"))
 		if selected_mode not in ["versus","survival"]:selected_mode="versus"
-		selected_arena=str(config.get_value("play","arena","cycle"))
-		if selected_arena not in Simulation.Arenas.IDS+["cycle"]:selected_arena="cycle"
 		bot_count=clampi(int(config.get_value("play","bots",3)),0,4-human_count)
 		round_lives=int(config.get_value("play","lives",1))
 		if round_lives not in [1,3,5]:round_lives=1
@@ -106,7 +103,7 @@ func save_settings()->void:
 	var config:=ConfigFile.new()
 	config.set_value("records","wave",best_wave);config.set_value("play","players",human_count);config.set_value("play","mode",selected_mode)
 	config.set_value("play","bots",bot_count);config.set_value("play","lives",round_lives)
-	config.set_value("play","fullscreen",fullscreen);config.set_value("play","arena",selected_arena)
+	config.set_value("play","fullscreen",fullscreen)
 	config.save("user://pond.cfg")
 
 func validate_players()->void:
@@ -223,7 +220,7 @@ func new_round(quick:bool=false)->void:
 	if not in_menu:arena_round+=1
 	settings.apply_live(sim)
 	for p in sim.frogs:
-		p.lives=int(settings.values.lives) if bridge.launched_by_daemon else round_lives
+		p.lives=int(settings.values.start_lives) if bridge.launched_by_daemon else round_lives
 		p["starting_lives"]=p.lives
 	sim.countdown=.8
 	if quick:
@@ -377,7 +374,7 @@ func managed_menu_action(row:int)->void:
 	if not in_menu or restart_pending or not running or bridge.phase!="running":return
 	match row:
 		0:resume_local()
-		2,3,4:managed_menu_change(row,1)
+		2,3:managed_menu_change(row,1)
 		1:
 			# Changing mode only adjusts our generated solo opponent. Host seats
 			# and controller tokens always remain authoritative.
@@ -386,17 +383,14 @@ func managed_menu_action(row:int)->void:
 			restart_pending=true;in_menu=false;paused_local=true;hud.hide_menu()
 			prepare_next_round()
 			if not preparing:finish_managed_round()
-		5:
+		4:
 			resume_local();bridge.request_overlay()
 
 func managed_menu_change(row:int,direction:int)->void:
 	if not in_menu or restart_pending:return
 	match row:
-		2:
-			var arenas:Array=Simulation.Arenas.IDS+["cycle"]
-			setting_changed("arena",arenas[posmod(arenas.find(selected_arena)+direction,arenas.size())])
-		3:setting_changed("mode","survival" if selected_mode=="versus" else "versus")
-		4:setting_changed("lives",posmod(round_lives-1+direction,9)+1)
+		2:setting_changed("mode","survival" if selected_mode=="versus" else "versus")
+		3:setting_changed("start_lives",posmod(round_lives-1+direction,9)+1)
 	hud.make_menu()
 
 func finish_managed_round()->void:
@@ -439,7 +433,7 @@ func toggle_fullscreen()->void:
 func prepare(session:String,seats:Array,players:Array)->void:
 	running=false;in_menu=false;hud.hide_menu();roster=[];next_round=1;arena_round=0
 	# Local saved lives must not override the host's shared match setting in UI.
-	round_lives=int(settings.values.lives)
+	round_lives=int(settings.values.start_lives)
 	var used_tokens:Dictionary={}
 	# Frogs follow where players sit on the couch, left to right.
 	for seat in Bridge.couch_order(seats,players):

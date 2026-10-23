@@ -46,25 +46,18 @@ func run()->void:
 	game.bridge.phase="running";game.start_managed("solo")
 	frame(128);check(not game.in_menu,"Start held across launch must first be released")
 	frame(0);frame(128)
-	check(game.in_menu and game.paused_local and game.hud.menu.get_child_count()==6,"Host Start opens settings and round actions")
+	check(game.in_menu and game.paused_local and game.hud.menu.get_child_count()==5,"Host Start opens settings and round actions")
 	var clock:float=game.sim.clock
 	game._physics_process(.1);check(game.sim.clock==clock,"Pause menu freezes simulation")
 	frame(128);check(game.in_menu,"Held Start does not resume")
 	frame(0);frame(128);check(not game.in_menu and not game.paused_local,"Fresh Start resumes same match")
 	frame(0);frame(128);frame(0);frame(8192)
 	check(game.hud.menu_row==1,"Host D-pad navigates managed menu")
-	frame(0);frame(8192);check(game.hud.menu_row==2,"Map row sits below the round actions")
 	var old:RefCounted=game.sim
-	tap(32768)
-	check(game.selected_arena=="vineway" and game.settings.values.arena=="vineway","Host D-pad right changes selected map")
-	tap(16384)
-	check(game.selected_arena=="terrarium","Host D-pad left changes selected map back")
-	frame(0,Vector2.RIGHT);frame(0,Vector2.RIGHT)
-	check(game.selected_arena=="vineway","Held analog direction changes once before repeat delay")
 	frame(0);tap(8192);tap(32768)
 	check(game.selected_mode=="survival","Mode is controller-editable")
 	tap(8192);tap(32768)
-	check(game.round_lives==2 and game.settings.values.lives==2,"Lives use the shared setting value")
+	check(game.round_lives==2 and game.settings.values.start_lives==2,"Lives use the shared setting value")
 	check(game.sim==old and old.arena_id=="terrarium" and old.mode=="versus","Paused selections do not replace current match")
 	await capture("-settings")
 	tap(128)
@@ -81,7 +74,7 @@ func run()->void:
 	check(game.hud.menu==null,"New round immediately removes all menu controls")
 	await settle()
 	check(game.sim!=old and not game.in_menu and not game.paused_local and not game.restart_pending,"Map transition finishes and unpauses")
-	check(game.sim.arena_id=="vineway" and game.sim.mode=="survival" and game.sim.frogs[0].lives==2,"New round applies selected map mode and lives")
+	check(game.sim.arena_id=="terrarium" and game.sim.mode=="survival" and game.sim.frogs[0].lives==2,"New round applies selected mode and lives")
 	check(game.roster.size()==1 and game.roster[0].controller=="pad","Survival removes only generated solo opponent and keeps host identity")
 	await capture("-new-round")
 	for i in 3:
@@ -93,7 +86,7 @@ func run()->void:
 		old=game.sim;tap(1);await settle()
 		check(game.sim!=old and not game.paused_local and game.hud.menu==null,"Repeated New round closes and resumes reliably")
 	# Host pause can interrupt an unfinished map build without a delayed restart.
-	tap(128);game.setting_changed("arena","grotto");game.hud.menu_row=1
+	tap(128);game.selected_arena="grotto";game.hud.menu_row=1
 	old=game.sim;tap(1)
 	check(game.restart_pending and game.preparing,"Cold map starts an incremental transition")
 	game.bridge.phase="paused";game.pause_managed("solo");await settle()
