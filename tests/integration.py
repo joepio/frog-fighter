@@ -30,6 +30,8 @@ def main():
                 command = [executable, '--headless']
                 if not args.packed:
                     command += ['--path', str(project)]
+                # The controller assertions below start at the Terrarium's -10/+10 spawns.
+                command += ['--', '--arena=terrarium']
                 child = subprocess.Popen(command, env=env, stdout=log, stderr=log)
                 host.connect()
                 messages = wait(lambda: host.messages, lambda ms: any(m['type'] == 'hello' for m in ms))
