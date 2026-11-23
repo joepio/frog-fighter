@@ -7,16 +7,16 @@ var connected_at := 0
 
 func _ready() -> void:
 	game_id = "frog-fighter"
-	launched_by_daemon = OS.get_environment("GAMENIGHT") == "1"
 	auto_reconnect = false
 	connected_at = Time.get_ticks_msec()
-	if launched_by_daemon:
-		super._ready()
+	super._ready()
 
 func _process(delta: float) -> void:
 	if not launched_by_daemon:
 		return
 	super._process(delta)
+	if _browser_transport.attached():
+		return
 	if _socket == null or (not _said_hello and Time.get_ticks_msec() - connected_at > 10000):
 		get_tree().quit()
 

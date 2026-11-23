@@ -388,3 +388,7 @@ Regenerate the original combat layers with `python tools/render_combat_audio.py`
 Run `tests/combat_audio.gd`, `tests/audio_bank.gd`, and `tests/combat.gd` for the
 audio lifecycle, bounded mix, and damage-confirmation checks. These checks do not
 replace a listening test on the actual TV speakers.
+
+## Browser build
+
+Install Godot 4.5.2 and its matching web export templates, then run `python tools/export_web.py --godot /path/to/godot` from the repository root. Serve `build/web/` over HTTP to play in a browser. The same build accepts the Splitscreen Club session and controller protocol when the lobby embeds it on the same origin. The CI artifact `frog-fighter-web` includes the game, browser bridge and license notices.

@@ -37,7 +37,7 @@ def main():
                 assert hello['game'] == 'frog-fighter' and hello['token'] == 'frog-test-token'
                 host.send('welcome', protocol_version=1, party={})
                 host.send('setting_changed', key='mode', value='versus')
-                host.send('setting_changed', key='lives', value=7)
+                host.send('setting_changed', key='start_lives', value=7)
                 seats = [dict(index=i, occupant=dict(kind='local', player_id=f'p{i}'), controller=token)
                          for i, token in [(0, 'ordinal:7'), (2, 'ordinal:2')]]
                 players = [dict(id='p0', name='Fern', color='#88bb55'), dict(id='p2', name='Poppy', color='#ee7766')]
@@ -49,7 +49,7 @@ def main():
                 assert ready['clock'] == 0 and ready['muted'] and not ready['running']
                 assert [p['controller'] for p in ready['players']] == ['ordinal:7', 'ordinal:2']
                 assert all(p['lives'] == 7 for p in ready['players']), ready
-                host.send('setting_changed', key='lives', value=5)
+                host.send('setting_changed', key='start_lives', value=5)
                 time.sleep(.2)
                 assert all(p['lives'] == 7 for p in read()['players']), 'Changing lives must wait for the next round'
                 assert len(ready['players']) == 2, 'Empty seats must not create frogs'
