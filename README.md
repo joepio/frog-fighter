@@ -1,6 +1,6 @@
 # Frog Fighter
 
-[Download for Windows](https://github.com/joepio/frog-fighter/releases/latest) · [GameNight store](https://gamenight.ontola.io/catalog#game=frog-fighter)
+[Play in browser](https://splitscreen.club/play/godot/frog-fighter/) · [Download for Windows](https://github.com/joepio/frog-fighter/releases/latest) · [GameNight store](https://gamenight.ontola.io/catalog#game=frog-fighter)
 
 Free, open-source party combat for 1–4 local players. Includes versus, survival, fifteen arenas, seven weapons, tongue grappling and destructible scenery. Contains exaggerated cartoon blood and dismemberment.
 

@@ -212,6 +212,21 @@ func build_stage(incremental:bool=false)->void:
 	for child in get_children():
 		if child!=stage and child not in existing:child.reparent(stage)
 
+# Weapon geometry and materials are static. Each holder needs its own nodes
+# for visibility and recoil, but their mesh resources can be shared.
+var weapon_templates:Array=[]
+
+func weapon_models_for(parent:Node3D)->Array:
+	if weapon_templates.is_empty():
+		weapon_templates=ForestWeapons.build(self,parent)
+		return weapon_templates
+	var models:Array=[]
+	for template:Node3D in weapon_templates:
+		var copy:=template.duplicate(0) as Node3D
+		parent.add_child(copy)
+		models.append(copy)
+	return models
+
 func build_actors()->void:
 	for p in sim.frogs:
 		frogs.append(make_frog(Color(p.color),frogs.size()))
@@ -227,7 +242,9 @@ func build_actors()->void:
 
 	for i in range(12):
 		var root:=Node3D.new();add_child(root);root.scale=Vector3.ONE*.78*sim.FROG_SCALE*sim.WEAPON_SCALE
-		pickup_models.append({"root":root,"models":ForestWeapons.build(self,root)})
+		pickup_models.append({"root":root,"models":weapon_models_for(root)})
+	# Pickups survive profile recolors, which replace the player models.
+	weapon_templates=pickup_models[0].models
 	combat=CombatFX.new();add_child(combat);combat.build(self)
 	blood_mesh=make_droplets(260,Color("c82337"))
 	stain_mesh=make_droplets(150,Color("991e30"))
@@ -357,7 +374,7 @@ func make_frog(color:Color,index:int=0)->Dictionary:
 	ball(arm,Vector3(.52,0,.07),Vector3(.27,.12,.14),color)
 	ball(arm,Vector3(.7,0,.07),Vector3(.13,.15,.15),color)
 	var gun:=Node3D.new();arm.add_child(gun);gun.position=Vector3(.83,0,.08)
-	var models:Array=ForestWeapons.build(self,gun)
+	var models:Array=weapon_models_for(gun)
 	var fire_light:=OmniLight3D.new();gun.add_child(fire_light);fire_light.position=Vector3(.72,0,.2)
 	fire_light.light_color=FlameStyle.color(.65);fire_light.omni_range=3;fire_light.light_energy=.9;fire_light.visible=false
 	dress_frog(body,character,color)
