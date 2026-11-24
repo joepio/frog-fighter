@@ -73,6 +73,16 @@ func tube(parent:Node3D,a:Vector3,b:Vector3,radius:float,color:Color)->MeshInsta
 		node.basis=Basis(x,direction,x.cross(direction))*Basis.from_scale(Vector3(1,maxf(.001,a.distance_to(b)),1))
 	return node
 
+func _ready()->void:
+	get_viewport().size_changed.connect(fit_arena_camera)
+
+func fit_arena_camera()->void:
+	if not is_instance_valid(camera) or sim==null:return
+	var view:=get_viewport().get_visible_rect().size
+	if view.x<=0 or view.y<=0:return
+	# Keep the whole arena, with room for edge jumps and impact shake.
+	camera.size=maxf(sim.ceiling+3.6,(sim.half_width*2+5)*view.y/view.x)
+
 func build(state:RefCounted)->void:
 	sim=state
 	build_stage()
@@ -104,6 +114,7 @@ func reset(state:RefCounted,prepared:Node3D=null)->void:
 		if prepared!=null:
 			stage=prepared.stage;stage.reparent(self)
 			camera=prepared.camera;camera.make_current()
+			fit_arena_camera()
 			shelves=prepared.shelves;boxes=prepared.boxes;water=prepared.water;landmarks=prepared.landmarks
 			landmarks.host=self
 			for child in stage.get_children():
@@ -135,7 +146,8 @@ func build_stage(incremental:bool=false)->void:
 	var fill:=DirectionalLight3D.new();fill.rotation_degrees=Vector3(-15,145,0)
 	fill.light_color=Color("c0d8d4");fill.light_energy=.20;add_child(fill)
 	camera=Camera3D.new();camera.projection=Camera3D.PROJECTION_ORTHOGONAL
-	camera.size=maxf(sim.ceiling+3.6,(sim.half_width*2+5)*9.0/16);camera.position=Vector3(0,sim.ceiling*.5+7.3,37)
+	fit_arena_camera()
+	camera.position=Vector3(0,sim.ceiling*.5+7.3,37)
 	add_child(camera);camera.look_at(Vector3(0,sim.ceiling*.5-.3,0));camera.current=true
 	var backdrop:=Backdrop.new();add_child(backdrop);backdrop.build(self)
 	if incremental:await get_tree().process_frame

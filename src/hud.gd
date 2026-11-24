@@ -4,6 +4,7 @@ var game:Node
 var serif:SystemFont
 var sans:SystemFont
 var bold:SystemFont
+const CONTROLS_SIZE:=Vector2(470,564)
 var menu:Control
 var status:=""
 var menu_row:=0
@@ -15,6 +16,7 @@ const MUTED=Color("bcc5ac")
 
 func _ready()->void:
 	mouse_filter=Control.MOUSE_FILTER_IGNORE
+	resized.connect(layout_menu)
 	serif=SystemFont.new();serif.font_names=PackedStringArray(["Georgia","DejaVu Serif"]);serif.font_weight=700
 	sans=SystemFont.new();sans.font_names=PackedStringArray(["Segoe UI","DejaVu Sans"])
 	bold=SystemFont.new();bold.font_names=sans.font_names;bold.font_weight=700
@@ -33,37 +35,34 @@ func panel(rect:Rect2,color:Color,radius:int=14)->void:
 func _draw()->void:
 	if game==null or game.sim==null:return
 	var s:RefCounted=game.sim
+	var center:=size*.5
 	if game.restart_pending:
-		panel(Rect2(480,360,640,150),Color(.045,.09,.065,.96),22)
-		centered("Preparing "+game.Simulation.Arenas.NAMES[game.round_arena()],Vector2(800,422),30,CREAM,bold)
-		centered("Your next round is almost ready",Vector2(800,465),18,MUTED)
+		panel(Rect2(center-Vector2(320,75),Vector2(640,150)),Color(.045,.09,.065,.96),22)
+		centered("Preparing "+game.Simulation.Arenas.NAMES[game.round_arena()],center-Vector2(0,13),30,CREAM,bold)
+		centered("Your next round is almost ready",center+Vector2(0,30),18,MUTED)
 		return
 	if game.in_menu:
-		if game.bridge.launched_by_daemon:
-			panel(Rect2(250,140,600,560),Color(.045,.09,.065,.96),22)
-			draw_game_logo(Rect2(310, 151, 480, 90))
-			draw_controls(Vector2(880,140))
-			return
-		panel(Rect2(70,95,500,165+(action_rows()+5)*58),Color(.045,.09,.065,.96),22)
-		draw_game_logo(Rect2(106, 108, 430, 95))
-		draw_controls(Vector2(600,95))
+		if not is_instance_valid(menu):return
+		draw_set_transform(menu.position,0,menu.scale)
+		var dimensions:=menu_panel_size()
+		panel(Rect2(Vector2.ZERO,dimensions),Color(.045,.09,.065,.96),22)
+		draw_game_logo(Rect2(35,12,dimensions.x-70,95))
+		draw_controls(controls_offset(dimensions))
 		return
 	var count:int=s.frogs.size()
+	var portrait_layout:=size.y>size.x
+	var columns:=2 if portrait_layout else 4
+	var card_scale:=1.75 if portrait_layout else 1.0
 	for i in range(count):
 		var p:Dictionary=s.frogs[i]
-		var x:float=800-count*112+i*224
+		var row:int=i/columns
+		var in_row:=mini(columns,count-row*columns)
+		var x:=center.x+(i%columns-(in_row-1)*.5)*224*card_scale
+		var card_origin:=Vector2(x-104*card_scale,20+row*62*card_scale)
+		draw_set_transform(card_origin,0,Vector2.ONE*card_scale)
+		draw_player_card(p)
+		draw_set_transform(Vector2.ZERO,0,Vector2.ONE)
 		var color:=Color(p.color)
-		panel(Rect2(x,20,208,53),Color(.045,.09,.065,.72),10)
-		draw_circle(Vector2(x+17,37),5,color)
-		text(p.name.left(12),Vector2(x+29,42),14,CREAM,bold)
-		for j in range(p.get("starting_lives",3)):draw_circle(Vector2(x+140+j*11,36),3,color if j<p.lives else Color("40523e"))
-		draw_rect(Rect2(x+13,53,182,5),Color("40523e"))
-		draw_rect(Rect2(x+13,53,182*clampf(p.hp/100,0,1),5),color.lerp(CREAM,clampf(p.flash/.19,0,1)))
-		if p.flash>0:
-			draw_rect(Rect2(x,20,208,53),Color(1,.85,.56,clampf(p.flash/.19,0,1)),false,2.0)
-		if not p.alive:text("OUT",Vector2(x+13,69),10,MUTED)
-		elif p.respawn>0:text("%.1f"%p.respawn,Vector2(x+13,69),10,MUTED)
-		elif not p.weapon.is_empty():text("%d"%p.ammo,Vector2(x+175,69),10,MUTED)
 		if not p.bot and p.alive and p.respawn<=0:
 			var aim:Vector2=game.world.screen_point(p.pos+p.aim*1.4)
 			draw_arc(aim,4,0,TAU,16,color,1.2,true)
@@ -79,20 +78,35 @@ func _draw()->void:
 		for corner in [Vector2(-1,-1),Vector2(1,-1),Vector2(-1,1),Vector2(1,1)]:
 			draw_line(point+corner*(8+age*7),point+corner*(14+age*7),Color(0,0,0,tint.a*.6),5,true)
 			draw_line(point+corner*(8+age*7),point+corner*(14+age*7),tint,2.5,true)
+	var score_bottom:=20+(53+62*int(count>columns))*card_scale
 	if s.mode=="survival":
-		centered("Wave %d · %d left"%[s.wave,s.enemies.size()],Vector2(800,97),13,MUTED)
+		centered("Wave %d · %d left"%[s.wave,s.enemies.size()],Vector2(center.x,score_bottom+24),13,MUTED)
 		for enemy in s.enemies:
 			if enemy.get("kind","")!="boss":continue
-			centered("BARON BEAK",Vector2(800,126),13,CREAM,bold)
-			panel(Rect2(660,136,280,5),Color("344638"),3)
-			panel(Rect2(660,136,280*clampf(enemy.hp/enemy.max_hp,0,1),5),Color("e9b970"),3)
+			centered("BARON BEAK",Vector2(center.x,score_bottom+53),13,CREAM,bold)
+			panel(Rect2(center.x-140,score_bottom+63,280,5),Color("344638"),3)
+			panel(Rect2(center.x-140,score_bottom+63,280*clampf(enemy.hp/enemy.max_hp,0,1),5),Color("e9b970"),3)
 			break
 	if s.countdown>0:
-		centered(str(ceili(s.countdown)),Vector2(800,450),90,CREAM,serif)
-		centered(s.Arenas.NAMES[s.arena_id],Vector2(800,493),23,CREAM,bold)
-		centered(s.Arenas.DESCRIPTIONS[s.arena_id],Vector2(800,523),16,MUTED)
+		centered(str(ceili(s.countdown)),center,90,CREAM,serif)
+		centered(s.Arenas.NAMES[s.arena_id],center+Vector2(0,43),23,CREAM,bold)
+		centered(s.Arenas.DESCRIPTIONS[s.arena_id],center+Vector2(0,73),16,MUTED)
 	if game.celebrating:
-		centered(game.last_result,Vector2(800,166),36,CREAM,bold)
+		centered(game.last_result,Vector2(center.x,score_bottom+93),36,CREAM,bold)
+
+func draw_player_card(p:Dictionary)->void:
+	var color:=Color(p.color)
+	panel(Rect2(0,0,208,53),Color(.045,.09,.065,.72),10)
+	draw_circle(Vector2(17,17),5,color)
+	text(p.name.left(12),Vector2(29,22),14,CREAM,bold)
+	for j in range(p.get("starting_lives",3)):
+		draw_circle(Vector2(140+j*11,16),3,color if j<p.lives else Color("40523e"))
+	draw_rect(Rect2(13,33,182,5),Color("40523e"))
+	draw_rect(Rect2(13,33,182*clampf(p.hp/100,0,1),5),color.lerp(CREAM,clampf(p.flash/.19,0,1)))
+	if p.flash>0:draw_rect(Rect2(0,0,208,53),Color(1,.85,.56,clampf(p.flash/.19,0,1)),false,2.0)
+	if not p.alive:text("OUT",Vector2(13,49),10,MUTED)
+	elif p.respawn>0:text("%.1f"%p.respawn,Vector2(13,49),10,MUTED)
+	elif not p.weapon.is_empty():text("%d"%p.ammo,Vector2(175,49),10,MUTED)
 
 # Xbox face-button colours; shoulders, triggers and sticks stay neutral.
 const BUTTON_COLORS={"A":Color("5fb336"),"B":Color("e0393e"),"X":Color("2f7fdf"),"Y":Color("f2c12e")}
@@ -118,15 +132,14 @@ func draw_controls(origin:Vector2)->void:
 		[["Start"],"Pause menu"],
 		[["Back"],"Game Room" if game.bridge.launched_by_daemon else "Pause menu"],
 	]
-	var height:float=150+rows.size()*46
-	panel(Rect2(origin,Vector2(470,height)),Color(.045,.09,.065,.9),22)
+	panel(Rect2(origin,CONTROLS_SIZE),Color(.045,.09,.065,.9),22)
 	text("Controls",origin+Vector2(32,54),22,CREAM,bold)
 	for i in rows.size():
 		var y:float=origin.y+98+i*46
 		var glyphs:Array=rows[i][0]
 		for j in glyphs.size():control_glyph(glyphs[j],Vector2(origin.x+52+j*46,y))
 		text(rows[i][1],Vector2(origin.x+150,y+7),18,CREAM)
-	text("Stick down + jump drops through a platform",Vector2(origin.x+32,origin.y+height-26),14,MUTED)
+	text("Stick down + jump drops through a platform",Vector2(origin.x+32,origin.y+CONTROLS_SIZE.y-26),14,MUTED)
 
 func action_rows()->int:
 	return 2 if game.paused_local else 1
@@ -212,18 +225,38 @@ func _process(dt:float)->void:
 	repeat_delay-=dt
 	if repeat_delay<=0:repeat_delay=.14;menu_move(held_direction)
 
+func menu_panel_size()->Vector2:
+	if game.bridge.launched_by_daemon:return Vector2(600,490)
+	return Vector2(500,140+(action_rows()+5)*58)
+
+func controls_offset(dimensions:Vector2)->Vector2:
+	if size.y>size.x*1.15:return Vector2((dimensions.x-CONTROLS_SIZE.x)*.5,dimensions.y+24)
+	return Vector2(dimensions.x+24,0)
+
+func layout_menu()->void:
+	if not is_instance_valid(menu):return
+	var panel_size:=menu_panel_size()
+	var extent:=panel_size.max(controls_offset(panel_size)+CONTROLS_SIZE)
+	var fit:=minf((size.x-40)/extent.x,(size.y-40)/extent.y)
+	# Enlarge the stacked cards on narrow screens so labels remain readable.
+	if size.y<=size.x*1.15:fit=minf(1.15,fit)
+	menu.scale=Vector2.ONE*maxf(.01,fit)
+	menu.position=(size-extent*menu.scale)*.5
+	queue_redraw()
+
 func make_menu()->void:
 	if not game.in_menu:
 		hide_menu()
 		return
 	if is_instance_valid(menu):remove_child(menu);menu.queue_free()
-	menu=Control.new();menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);menu.mouse_filter=Control.MOUSE_FILTER_IGNORE;add_child(menu)
+	menu=Control.new();menu.mouse_filter=Control.MOUSE_FILTER_IGNORE;add_child(menu)
+	layout_menu()
 	if game.bridge.launched_by_daemon:
 		menu_row=clampi(menu_row,0,4)
 		var labels:Array=["Resume","Start new round","Mode","Lives","Back to Game Room"]
 		var values:Array=["","",game.selected_mode.capitalize(),str(game.round_lives),""]
 		for row in 5:
-			var button:=Button.new();button.position=Vector2(285,256+row*64);button.size=Vector2(530,55)
+			var button:=Button.new();button.position=Vector2(35,116+row*64);button.size=Vector2(530,55)
 			button.set_meta("menu_key",["resume","restart","mode","lives","lobby"][row])
 			button.text=labels[row]+("    ‹  "+values[row]+"  ›" if not values[row].is_empty() else "")
 			button.focus_mode=Control.FOCUS_NONE
@@ -245,7 +278,7 @@ func make_menu()->void:
 	for row in range(labels.size()):
 		var selected:bool=row==menu_row
 		var enabled:bool=row_enabled(row)
-		var b:=Button.new();b.position=Vector2(105,215+row*58);b.size=Vector2(430,51);b.focus_mode=Control.FOCUS_NONE
+		var b:=Button.new();b.position=Vector2(35,120+row*58);b.size=Vector2(430,51);b.focus_mode=Control.FOCUS_NONE
 		b.set_meta("menu_key",keys[row])
 		b.disabled=not enabled
 		for state in ["normal","hover","pressed","disabled"]:

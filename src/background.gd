@@ -122,7 +122,10 @@ func fit_camera()->void:
 	var extent:Vector2=camera.get_viewport().get_visible_rect().size
 	var aspect:float=extent.x/maxf(1,extent.y)
 	var size_value:=Vector2(camera.size*aspect,camera.size) if camera.keep_aspect==Camera3D.KEEP_HEIGHT else Vector2(camera.size,camera.size/aspect)
-	image_quad.size=size_value*1.02
+	# Cover the view with the 16:9 scenery bake without distorting the art.
+	var plate_aspect:=float(viewport.size.x)/viewport.size.y
+	var height:=maxf(size_value.y,size_value.x/plate_aspect)
+	image_quad.size=Vector2(height*plate_aspect,height)*1.02
 	image_plane.global_transform=camera.get_camera_transform()*Transform3D(Basis.IDENTITY,Vector3(0,0,-46))
 
 func _process(_dt:float)->void:
