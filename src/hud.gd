@@ -5,6 +5,9 @@ var serif:SystemFont
 var sans:SystemFont
 var bold:SystemFont
 const CONTROLS_SIZE:=Vector2(470,564)
+# The web host places its room button 8 CSS pixels from the upper right.
+const ROOM_BUTTON_SPACE_CSS:=Vector2(120,48)
+var room_button_space:=Vector2.ZERO
 var menu:Control
 var status:=""
 var menu_row:=0
@@ -16,7 +19,8 @@ const MUTED=Color("bcc5ac")
 
 func _ready()->void:
 	mouse_filter=Control.MOUSE_FILTER_IGNORE
-	resized.connect(layout_menu)
+	resized.connect(update_layout)
+	update_layout()
 	serif=SystemFont.new();serif.font_names=PackedStringArray(["Georgia","DejaVu Serif"]);serif.font_weight=700
 	sans=SystemFont.new();sans.font_names=PackedStringArray(["Segoe UI","DejaVu Sans"])
 	bold=SystemFont.new();bold.font_names=sans.font_names;bold.font_weight=700
@@ -53,14 +57,27 @@ func _draw()->void:
 	var portrait_layout:=size.y>size.x
 	var columns:=2 if portrait_layout else 4
 	var card_scale:=1.75 if portrait_layout else 1.0
+	var name_size:=14
+	if room_button_space.y>0 and count>0:
+		var units_per_css_pixel:=room_button_space.y/ROOM_BUTTON_SPACE_CSS.y
+		if not portrait_layout:
+			# Use the spare width in a short window to keep one readable row.
+			var row_width:=mini(columns,count)*224.0-16.0
+			var max_scale:=maxf(1.0,(size.x-24*units_per_css_pixel)/row_width)
+			card_scale=clampf(.68*units_per_css_pixel,1.0,max_scale)
+		name_size=clampi(ceili(9.5*units_per_css_pixel/card_scale),14,20)
+	var score_top:=20.0
+	var row_right:=center.x+(mini(columns,count)*112-8)*card_scale
+	if row_right>size.x-room_button_space.x:
+		score_top=maxf(score_top,room_button_space.y)
 	for i in range(count):
 		var p:Dictionary=s.frogs[i]
 		var row:int=i/columns
 		var in_row:=mini(columns,count-row*columns)
 		var x:=center.x+(i%columns-(in_row-1)*.5)*224*card_scale
-		var card_origin:=Vector2(x-104*card_scale,20+row*62*card_scale)
+		var card_origin:=Vector2(x-104*card_scale,score_top+row*62*card_scale)
 		draw_set_transform(card_origin,0,Vector2.ONE*card_scale)
-		draw_player_card(p)
+		draw_player_card(p,name_size)
 		draw_set_transform(Vector2.ZERO,0,Vector2.ONE)
 		var color:=Color(p.color)
 		if not p.bot and p.alive and p.respawn<=0:
@@ -78,7 +95,7 @@ func _draw()->void:
 		for corner in [Vector2(-1,-1),Vector2(1,-1),Vector2(-1,1),Vector2(1,1)]:
 			draw_line(point+corner*(8+age*7),point+corner*(14+age*7),Color(0,0,0,tint.a*.6),5,true)
 			draw_line(point+corner*(8+age*7),point+corner*(14+age*7),tint,2.5,true)
-	var score_bottom:=20+(53+62*int(count>columns))*card_scale
+	var score_bottom:=score_top+(53+62*int(count>columns))*card_scale
 	if s.mode=="survival":
 		centered("Wave %d · %d left"%[s.wave,s.enemies.size()],Vector2(center.x,score_bottom+24),13,MUTED)
 		for enemy in s.enemies:
@@ -94,11 +111,13 @@ func _draw()->void:
 	if game.celebrating:
 		centered(game.last_result,Vector2(center.x,score_bottom+93),36,CREAM,bold)
 
-func draw_player_card(p:Dictionary)->void:
+func draw_player_card(p:Dictionary,name_size:int)->void:
 	var color:=Color(p.color)
 	panel(Rect2(0,0,208,53),Color(.045,.09,.065,.72),10)
 	draw_circle(Vector2(17,17),5,color)
-	text(p.name.left(12),Vector2(29,22),14,CREAM,bold)
+	# Leave the lives visible even for a guest name made of wide glyphs.
+	var name_width:=104.0 if room_button_space.y>0 else -1.0
+	draw_string(bold,Vector2(29,22),p.name.left(12),HORIZONTAL_ALIGNMENT_LEFT,name_width,name_size,CREAM)
 	for j in range(p.get("starting_lives",3)):
 		draw_circle(Vector2(140+j*11,16),3,color if j<p.lives else Color("40523e"))
 	draw_rect(Rect2(13,33,182,5),Color("40523e"))
@@ -232,6 +251,14 @@ func menu_panel_size()->Vector2:
 func controls_offset(dimensions:Vector2)->Vector2:
 	if size.y>size.x*1.15:return Vector2((dimensions.x-CONTROLS_SIZE.x)*.5,dimensions.y+24)
 	return Vector2(dimensions.x+24,0)
+
+func update_layout()->void:
+	if OS.has_feature("web") and game.bridge.launched_by_daemon:
+		var browser:=JavaScriptBridge.get_interface("window")
+		var css_size:=Vector2(browser.innerWidth,browser.innerHeight)
+		if css_size.x>0 and css_size.y>0:
+			room_button_space=ROOM_BUTTON_SPACE_CSS*size/css_size
+	layout_menu()
 
 func layout_menu()->void:
 	if not is_instance_valid(menu):return
