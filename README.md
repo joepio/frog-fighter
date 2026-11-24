@@ -1,6 +1,6 @@
 # Frog Fighter
 
-[Download for Windows](https://github.com/joepio/frog-fighter/releases/latest) · [GameNight store](https://gamenight.ontola.io/catalog#game=frog-fighter)
+[Play in browser](https://splitscreen.club/play/godot/frog-fighter/) · [Download for Windows](https://github.com/joepio/frog-fighter/releases/latest) · [GameNight store](https://gamenight.ontola.io/catalog#game=frog-fighter)
 
 Free, open-source party combat for 1–4 local players. Includes versus, survival, fifteen arenas, seven weapons, tongue grappling and destructible scenery. Contains exaggerated cartoon blood and dismemberment.
 
@@ -388,3 +388,7 @@ Regenerate the original combat layers with `python tools/render_combat_audio.py`
 Run `tests/combat_audio.gd`, `tests/audio_bank.gd`, and `tests/combat.gd` for the
 audio lifecycle, bounded mix, and damage-confirmation checks. These checks do not
 replace a listening test on the actual TV speakers.
+
+## Browser build
+
+Install Godot 4.5.2 and its matching web export templates, then run `python tools/export_web.py --godot /path/to/godot` from the repository root. Serve `build/web/` over HTTP to play in a browser. The same build accepts the Splitscreen Club session and controller protocol when the lobby embeds it on the same origin. The CI artifact `frog-fighter-web` includes the game, browser bridge and license notices.

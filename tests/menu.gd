@@ -107,6 +107,7 @@ func run()->void:
 	for i in range(3):await process_frame
 	game.best_wave=9;game.save_settings();game.best_wave=0;game.load_settings()
 	check(game.best_wave==9,"Survival best wave persists")
+	await check_layouts(game)
 	if previous.is_empty():DirAccess.remove_absolute(ProjectSettings.globalize_path(config_path))
 	else:
 		var f:=FileAccess.open(config_path,FileAccess.WRITE);f.store_string(previous);f.close()
@@ -115,3 +116,34 @@ func run()->void:
 	game.queue_free();await process_frame
 	print("Frog Fighter menu/lifecycle: %d checks, %d failures"%[checks,failures])
 	quit(1 if failures else 0)
+
+
+func check_layouts(game:Node)->void:
+	var original_size:=root.size
+	game.set_players(4)
+	game.set_bots(0)
+	for arena in ["bell_tower","reed_delta"]:
+		game.set_arena(arena)
+		game.start_local()
+		var active_round:RefCounted=game.sim
+		for extent in [Vector2i(1280,720),Vector2i(800,600),Vector2i(1400,600),Vector2i(390,844)]:
+			root.size=extent
+			await process_frame
+			var hud:Control=game.hud
+			var bounds:=Rect2(Vector2.ZERO,hud.size)
+			check(absf(hud.size.aspect()-Vector2(extent).aspect())<.01,"HUD fills "+str(extent))
+			for side in [-1,1]:
+				for height in [0,game.sim.ceiling]:
+					var corner:Vector2=game.world.screen_point(Vector2(side*game.sim.half_width,height))
+					check(bounds.has_point(corner),"%s arena corner stays visible at %s"%[arena,extent])
+			for frog in game.sim.frogs:
+				check(bounds.has_point(game.world.screen_point(frog.pos)),"Every frog remains on screen")
+			game.toggle_menu()
+			var panel_size:Vector2=hud.menu_panel_size()
+			var controls:=Rect2(hud.menu.position+hud.controls_offset(panel_size)*hud.menu.scale,hud.CONTROLS_SIZE*hud.menu.scale)
+			check(bounds.encloses(controls),"Controller reference fits "+str(extent))
+			for button in hud.menu.get_children():
+				check(bounds.encloses(button.get_global_rect()),"Pause button fits "+str(extent))
+			game.resume_local()
+			check(game.sim==active_round and game.running,"Resize preserves the current round")
+	root.size=original_size

@@ -47,6 +47,14 @@ signal setting_changed(key: String, value: Variant)
 ## declare_settings(), with every prepare and roster update, and whenever that
 ## player changes one. Saved with their profile between nights.
 signal player_settings_changed(player_id: String, values: Dictionary)
+## One player's saved progress (unlocks, stats), as you last stored it with
+## [method save_player_data]. Arrives with every prepare and roster update for
+## players that have any, and after each save. Kept with their profile
+## between nights; a guest's lasts the night and moves along when they sign in.
+signal player_data_changed(player_id: String, data: Variant)
+## A player pressed one of your [method declare_actions] buttons on their
+## phone, like "New round". The host already wrote it in the room log.
+signal action_triggered(key: String, player_id: String)
 
 const PROTOCOL := preload("protocol.gd")
 const PROTOCOL_VERSION := PROTOCOL.PROTOCOL_VERSION
@@ -72,12 +80,13 @@ var session := ""
 var phase := "idle"
 var _frames: Dictionary = {}
 var _frame_at := -10000
-## True when this process was launched by a GameNight daemon (GAMENIGHT=1).
+## True when launched by the daemon or embedded by a Splitscreen Club web host.
 ## Games use this to skip their menu and boot straight into party mode.
 var launched_by_daemon: bool = false
 
 var _launch_token: String = ""
 
+var _browser_transport = preload("browser_transport.gd").new()
 var _socket: WebSocketPeer
 var _said_hello := false
 var _reconnect_at := 0.0
@@ -94,7 +103,7 @@ func _reset_performance(session_id: String) -> void:
 	_performance_sent_us = 0
 	_performance = {"frames":0,"elapsed_us":0,"slow_frames":0,"max_frame_us":0,
 		"cpu":OS.get_processor_name().left(128),"gpu":RenderingServer.get_video_adapter_name().left(128),
-		"os":OS.get_name(),"memory_mib":int(OS.get_memory_info().get("physical",0)/1048576)}
+		"os":OS.get_name(),"memory_mib":0 if OS.has_feature("web") else int(OS.get_memory_info().get("physical",0)/1048576)}
 
 func _sample_performance() -> void:
 	var now_us := Time.get_ticks_usec()
@@ -119,6 +128,7 @@ func _sample_performance() -> void:
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	if _open_browser_parent(): return
 	# The daemon passes the handshake via environment — same binary boots
 	# into game-night mode when launched, runs standalone otherwise.
 	launched_by_daemon = OS.get_environment(PROTOCOL.ENV_GAMENIGHT) == "1"
@@ -140,6 +150,7 @@ func _ready() -> void:
 ## Connect a hand-started game to the host at [member daemon_url] after all,
 ## for example from a debug menu. GameNight-launched games are always online.
 func connect_to_host() -> void:
+	if _browser_transport.attached(): return
 	auto_reconnect = true
 	if _socket == null:
 		_open()
@@ -151,10 +162,13 @@ func _open() -> void:
 	_said_hello = false
 	var err := _socket.connect_to_url(daemon_url)
 	if err != OK:
-		push_warning("GameNight: cannot reach daemon at %s (%s)" % [daemon_url, err])
+		push_warning("Splitscreen Club: cannot reach daemon at %s (%s)" % [daemon_url, err])
 		_schedule_reconnect()
 
 func _process(_delta: float) -> void:
+	if _browser_transport.attached():
+		_sample_performance()
+		return
 	if _socket == null:
 		if auto_reconnect and Time.get_ticks_msec() / 1000.0 >= _reconnect_at:
 			_open()
@@ -280,6 +294,21 @@ func declare_settings(settings: Array) -> void:
 
 var _declared_settings: Array = []
 
+## Offer buttons on the players' phones, next to your settings: things that
+## happen once, like "New round" or "Skip level". Call once, any time after
+## _ready(); the addon re-declares after every reconnect, and an empty Array
+## removes them. Each entry is a Dictionary:
+##   { "key": "new_round", "label": "New round",
+##     "description": "Ends this round for everyone.", "confirm": true }
+## `confirm` makes the phone ask first. At most 12, labels up to 40
+## characters. Presses arrive via [signal action_triggered], only while your
+## session is the one being played, and the room log says who pressed it.
+func declare_actions(actions: Array) -> void:
+	_declared_actions = actions
+	_send({"type": PROTOCOL.MSG_DECLARE_ACTIONS, "actions": actions})
+
+var _declared_actions: Array = []
+
 ## Change one of this game's declared settings, for example from its own
 ## Start menu, so the party's apps (and an LLM) show the same value. The daemon
 ## validates it and answers with [signal setting_changed], like any other write.
@@ -296,6 +325,51 @@ func player_setting(player_id: String, key: String, fallback: Variant = null) ->
 	return _player_settings.get(player_id, {}).get(key, fallback)
 
 var _player_settings: Dictionary = {}
+
+## A player's saved progress, or `fallback` when nothing is saved yet.
+func player_data(player_id: String, fallback: Variant = {}) -> Variant:
+	return _player_data.get(player_id, fallback)
+
+## Save one player's own progress: any JSON-able value up to 64 KB, replacing
+## what was there. Answered with [signal player_data_changed]. A save made
+## against an older copy than the host has is refused (a warning is printed),
+## so two hosts never overwrite each other: merge in the newer data and save
+## again.
+func save_player_data(player_id: String, data: Variant) -> void:
+	_player_data[player_id] = data
+	_send({"type": PROTOCOL.MSG_SAVE_PLAYER_DATA, "player_id": player_id, "data": data,
+		"expected_revision": int(_player_data_revision.get(player_id, 0))})
+
+## Everything in list `key` of the saved progress of the players here now,
+## for the session only: one player's unlock is everyone's tonight. Never save
+## this back into a player's own data.
+func party_union(key: String = "unlocks") -> Array:
+	var union: Array = []
+	for player in party.get("players", []):
+		var data: Variant = _player_data.get(str(player.get("id", "")), {})
+		if data is Dictionary:
+			for item in data.get(key, []):
+				if not union.has(item):
+					union.append(item)
+	return union
+
+## Add `item` to list `key` in the saved progress of every player here now:
+## what the group earns together counts for everyone who was there.
+func unlock_for_present(item: Variant, key: String = "unlocks") -> void:
+	for player in party.get("players", []):
+		var id := str(player.get("id", ""))
+		var data: Variant = _player_data.get(id, {})
+		if not data is Dictionary:
+			data = {}
+		var list: Array = data.get(key, [])
+		if list.has(item):
+			continue
+		list.append(item)
+		data[key] = list
+		save_player_data(id, data)
+
+var _player_data: Dictionary = {}
+var _player_data_revision: Dictionary = {}
 
 ## Optional: give each player a screen of their own on their phone (see
 ## "Phone screens" in docs/protocol.md). `root` is an absolute directory the
@@ -323,7 +397,7 @@ func declare_companion_folder(folder: String = "res://phone", entry: String = "i
 	var target := "user://gamenight-phone"
 	var files := _companion_files(folder, "")
 	if files.is_empty():
-		push_warning("GameNight: no phone screen files found in %s" % folder)
+		push_warning("Splitscreen Club: no phone screen files found in %s" % folder)
 		return ""
 	DirAccess.make_dir_recursive_absolute(target)
 	var total := 0
@@ -332,16 +406,16 @@ func declare_companion_folder(folder: String = "res://phone", entry: String = "i
 		var encoded := int(ceil(data.size() / 3.0)) * 4
 		total += encoded
 		if encoded > 512 * 1024:
-			push_warning("GameNight: phone file %s is %d KiB in a hosted room; the limit is 512 KiB" % [path, encoded >> 10])
+			push_warning("Splitscreen Club: phone file %s is %d KiB in a hosted room; the limit is 512 KiB" % [path, encoded >> 10])
 		if not path.get_extension().to_lower() in COMPANION_TYPES:
-			push_warning("GameNight: hosted rooms do not serve phone file %s (use HTML, JS, CSS, JSON, SVG, PNG, JPEG, WebP or WOFF2)" % path)
+			push_warning("Splitscreen Club: hosted rooms do not serve phone file %s (use HTML, JS, CSS, JSON, SVG, PNG, JPEG, WebP or WOFF2)" % path)
 		DirAccess.make_dir_recursive_absolute(target.path_join(path.get_base_dir()))
 		var out := FileAccess.open(target.path_join(path), FileAccess.WRITE)
 		if out == null: continue
 		out.store_buffer(data)
 		out.close()
 	if files.size() > 128 or total > 2 * 1024 * 1024:
-		push_warning("GameNight: the phone screen is %d files, %d KiB in a hosted room; the limit is 128 files, 2048 KiB" % [files.size(), total >> 10])
+		push_warning("Splitscreen Club: the phone screen is %d files, %d KiB in a hosted room; the limit is 128 files, 2048 KiB" % [files.size(), total >> 10])
 	var root := ProjectSettings.globalize_path(target)
 	declare_companion(root, entry, app)
 	return root
@@ -355,7 +429,7 @@ func _companion_files(folder: String, prefix: String) -> Array:
 	for name in dir.get_files():
 		if name.ends_with(".import"):
 			if not dir.file_exists(name.trim_suffix(".import")):
-				push_warning("GameNight: %s was imported, not exported raw; set its importer to Keep File" % prefix.path_join(name.trim_suffix(".import")))
+				push_warning("Splitscreen Club: %s was imported, not exported raw; set its importer to Keep File" % prefix.path_join(name.trim_suffix(".import")))
 			continue
 		if name.ends_with(".uid") or name.ends_with(".remap"): continue
 		found.append(prefix.path_join(name))
@@ -452,7 +526,7 @@ static func couch_order(seats: Array, players: Array) -> Array:
 ## Standalone-only convenience. Managed games must use frame_for_seat instead.
 func devices_for_local_seats(count: int) -> Array:
 	if launched_by_daemon:
-		push_warning("Use frame_for_seat: local device indices do not identify GameNight players.")
+		push_warning("Use frame_for_seat: local device indices do not identify Splitscreen Club players.")
 		return []
 	var devices: Array = Array(Input.get_connected_joypads()).slice(0,count)
 	if devices.size() < count: devices.append(-1)
@@ -540,6 +614,10 @@ static func button(frame: Dictionary, index: int) -> bool:
 
 
 func _send(msg: Dictionary) -> void:
+	if _browser_transport.attached():
+		if _said_hello:
+			_browser_transport.send(msg)
+		return
 	if _socket != null and _socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
 		_socket.send_text(JSON.stringify(msg))
 
@@ -584,7 +662,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _raise_overlay() -> void:
 	if overlay_url == "":
-		push_warning("GameNight: overlay_url not set (GAMENIGHT_OVERLAY_URL) — cannot raise the party overlay")
+		push_warning("Splitscreen Club: overlay_url not set (GAMENIGHT_OVERLAY_URL) — cannot raise the party overlay")
 		return
 	OS.shell_open(overlay_url)
 
@@ -596,7 +674,7 @@ func _handle(msg: Variant) -> void:
 	match kind:
 		PROTOCOL.MSG_WELCOME:
 			if int(msg.get("godot_sdk", 0)) > SDK_VERSION:
-				push_warning("GameNight: this game's addons/gamenight (version %d) is older than GameNight's (%d). Update it with sdk/godot/sync.py." % [SDK_VERSION, int(msg.get("godot_sdk", 0))])
+				push_warning("Splitscreen Club: this game's addons/gamenight (version %d) is older than Splitscreen Club's (%d). Update it with sdk/godot/sync.py." % [SDK_VERSION, int(msg.get("godot_sdk", 0))])
 			party = msg.get("party", {})
 			daemon_connected.emit()
 			party_updated.emit(party)
@@ -604,6 +682,8 @@ func _handle(msg: Variant) -> void:
 			# party changed while we were away.
 			if not _declared_settings.is_empty():
 				_send({"type": PROTOCOL.MSG_DECLARE_SETTINGS, "settings": _declared_settings})
+			if not _declared_actions.is_empty():
+				_send({"type": PROTOCOL.MSG_DECLARE_ACTIONS, "actions": _declared_actions})
 			if not _declared_companion.is_empty():
 				_send(_declared_companion)
 		PROTOCOL.MSG_PARTY_STATE:
@@ -682,9 +762,28 @@ func _handle(msg: Variant) -> void:
 					values[key] = int(value) if value is float else value
 			_player_settings[player_id] = values
 			player_settings_changed.emit(player_id, values)
+		PROTOCOL.MSG_PLAYER_DATA:
+			var player_id := str(msg.get("player_id", ""))
+			_player_data[player_id] = msg.get("data")
+			_player_data_revision[player_id] = int(msg.get("revision", 0))
+			player_data_changed.emit(player_id, msg.get("data"))
+		PROTOCOL.MSG_ACTION_TRIGGERED:
+			action_triggered.emit(str(msg.get("key", "")), str(msg.get("player_id", "")))
 		PROTOCOL.MSG_COMPANION_MESSAGE:
 			companion_message.emit(str(msg.get("player_id", "")), msg.get("data"))
 		PROTOCOL.MSG_COMPANION_PRESENCE:
 			companion_presence.emit(str(msg.get("player_id", "")), bool(msg.get("connected", false)))
 		PROTOCOL.MSG_ERROR:
-			push_warning("GameNight daemon: %s" % msg.get("message", "unknown error"))
+			push_warning("Splitscreen Club daemon: %s" % msg.get("message", "unknown error"))
+
+func _open_browser_parent() -> bool:
+	if not _browser_transport.attach(_handle): return false
+	launched_by_daemon = true
+	auto_reconnect = false
+	_browser_hello.call_deferred()
+	return true
+
+func _browser_hello() -> void:
+	await get_tree().process_frame
+	_said_hello = true
+	_send({"type": PROTOCOL.MSG_HELLO, "role": PROTOCOL.ROLE_GAME, "game": game_id, "protocol_version": PROTOCOL_VERSION})

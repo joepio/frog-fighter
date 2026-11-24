@@ -201,7 +201,10 @@ func prepare_next_round()->void:
 	preparing=true
 	var generation:int=preparation_generation
 	var viewport:=SubViewport.new();viewport.own_world_3d=true
-	viewport.size=get_viewport().get_visible_rect().size
+	# Warm the same aspect as the live round in a small render target.
+	# The preloaded arena switches to the live camera framing when adopted.
+	var extent:=get_viewport().get_visible_rect().size
+	viewport.size=Vector2i(extent*minf(1.0,512.0/maxf(extent.x,extent.y))).max(Vector2i(2,2))
 	viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED
 	add_child(viewport)
 	var preview:=World.new();viewport.add_child(preview);preview.sim=pending_sim

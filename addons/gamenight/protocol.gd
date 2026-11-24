@@ -22,10 +22,11 @@ const ENV_OVERLAY_URL := "GAMENIGHT_OVERLAY_URL"
 const ENV_TOKEN := "GAMENIGHT_TOKEN"
 const DEFAULT_ADDR := "127.0.0.1:7912"
 const DEFAULT_WEB_PORT := 7913
-const GODOT_SDK_VERSION := 5
+const GODOT_SDK_VERSION := 8
 const PROTOCOL_VERSION := 1
 
 ## Message "type" tags, both directions.
+const MSG_ACTION_TRIGGERED := "action_triggered"
 const MSG_APPLY_UPDATE := "apply_update"
 const MSG_ASSIGN_SEAT := "assign_seat"
 const MSG_BIND_CONTROLLER := "bind_controller"
@@ -36,6 +37,7 @@ const MSG_COMPANION_PRESENCE := "companion_presence"
 const MSG_CONTROL_SETTINGS := "control_settings"
 const MSG_CONTROLLER_FRAME := "controller_frame"
 const MSG_CONTROLLER_INPUT := "controller_input"
+const MSG_DECLARE_ACTIONS := "declare_actions"
 const MSG_DECLARE_COMMANDS := "declare_commands"
 const MSG_DECLARE_COMPANION := "declare_companion"
 const MSG_DECLARE_SETTINGS := "declare_settings"
@@ -60,7 +62,9 @@ const MSG_PARTY_UPDATED := "party_updated"
 const MSG_PAUSE := "pause"
 const MSG_PERFORMANCE := "performance"
 const MSG_PLAY_NEXT := "play_next"
+const MSG_PLAYER_DATA := "player_data"
 const MSG_PLAYER_SETTINGS := "player_settings"
+const MSG_PLAYER_STORE_DRIVES := "player_store_drives"
 const MSG_PLAYERS_UPDATED := "players_updated"
 const MSG_PLAYTESTS := "playtests"
 const MSG_PREPARE := "prepare"
@@ -77,6 +81,7 @@ const MSG_RESUME := "resume"
 const MSG_RETRY_LOBBY := "retry_lobby"
 const MSG_ROOM_LOG := "room_log"
 const MSG_RUMBLE := "rumble"
+const MSG_SAVE_PLAYER_DATA := "save_player_data"
 const MSG_SET_COUCH_POSITION := "set_couch_position"
 const MSG_SET_PHONES := "set_phones"
 const MSG_SET_PLAYER_AVATAR := "set_player_avatar"
@@ -91,6 +96,7 @@ const MSG_SETTINGS_ACCEPTED := "settings_accepted"
 const MSG_START := "start"
 const MSG_SWAP_SEATS := "swap_seats"
 const MSG_SWITCH_LOBBY := "switch_lobby"
+const MSG_TRIGGER_ACTION := "trigger_action"
 const MSG_VOTE := "vote"
 const MSG_WELCOME := "welcome"
 
@@ -103,7 +109,18 @@ const ACTIVITY_KIND_GAME_STARTED := "game_started"
 const ACTIVITY_KIND_SETTING := "setting"
 const ACTIVITY_KIND_PROFILE := "profile"
 const ACTIVITY_KIND_ROUND := "round"
+const ACTIVITY_KIND_ACTION := "action"
 const ACTIVITY_KIND_GAME := "game"
+
+## BackChordAction
+const BACK_CHORD_ACTION_NEXT := "next"
+const BACK_CHORD_ACTION_PREVIOUS := "previous"
+const BACK_CHORD_ACTION_LEAVE := "leave"
+
+## BackChordButton
+const BACK_CHORD_BUTTON_RB := "rb"
+const BACK_CHORD_BUTTON_LB := "lb"
+const BACK_CHORD_BUTTON_B := "b"
 
 ## GameIssueKind
 const GAME_ISSUE_KIND_CLOSED := "closed"

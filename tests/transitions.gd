@@ -52,6 +52,8 @@ func run()->void:
  # Verify the actual main-loop handoff and managed stick routing, not just a timer.
  var game=load("res://main.tscn").instantiate();root.add_child(game)
  game.set_process(false);game.set_physics_process(false)
+ # The victory-lap movement fixture needs clear space around its fixed world position.
+ game.selected_arena="terrarium"
  game.running=true;game.in_menu=false;game.roster=roster;game.selected_mode="versus";game.new_round()
  game.bridge.launched_by_daemon=true
  game.sim.frogs[0].controller="pad-one"

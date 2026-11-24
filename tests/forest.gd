@@ -90,5 +90,14 @@ func run()->void:
 	organs[0].pos=Vector2(0,6.2+organs[0].radius+.05);organs[0].vel=Vector2(0,-6);s.update_gore(.02)
 	check(organs[0].bounces==1 and organs[0].bounce_squash>0,"Organs bounce and squash when they land")
 	var life:float=organs[0].life;s.update_gore(.02);check(organs[0].life<life,"Organs expire with the other debris")
+	# Player meshes are replaced when a lobby profile changes color.
+	var pickup_weapon:Node3D=world.pickup_models[0].models[0]
+	var pickup_mesh:MeshInstance3D=pickup_weapon.find_children("*","MeshInstance3D",true,false)[0]
+	for color:Color in [Color.PURPLE,Color.ORANGE]:
+		world.frogs[0].root.free()
+		world.frogs[0]=world.make_frog(color,0)
+		var held_weapon:Node3D=world.frogs[0].muzzles[0]
+		var held_mesh:MeshInstance3D=held_weapon.find_children("*","MeshInstance3D",true,false)[0]
+		check(held_weapon!=pickup_weapon and held_mesh.mesh==pickup_mesh.mesh,"Recolored frog keeps independent weapon nodes with shared geometry")
 	world.free()
 	print("Frog Fighter forest combat: %d checks, %d failures"%[checks,failures]);quit(1 if failures else 0)

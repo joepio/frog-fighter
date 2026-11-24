@@ -56,6 +56,7 @@ func build(world:Node3D)->void:
 		for node in [flash,halo,smoke]:node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.visible=false;bursts.append({"root":root,"flash":flash,"halo":halo,"smoke":smoke,"mat":mat,"additive":additive,"clouds":clouds,"mist_mat":mist_mat,"fire":fire,"flame_mat":flame_mat,"soot":soot,"soot_mat":soot_mat})
 	var trail_mat:=glow(Color(1,.79,.35,.65))
+	var burr_template:Node3D
 	for i in range(128):
 		var root:=Node3D.new();add_child(root)
 		var seed:MeshInstance3D=host.ball(root,Vector3.ZERO,Vector3(.25,.023,.023),Color("c2cc77"))
@@ -68,7 +69,15 @@ func build(world:Node3D)->void:
 		var fuse:MeshInstance3D=host.ball(root,Vector3(0,.17,.02),Vector3(.055,.055,.055),Color("ffe7a0"))
 		fuse.material_override=glow(Color("ffe7a0"))
 		for node in [seed,bramble,cup,stem,trail,grenade,fuse]:node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		var burr:Node3D=host.ForestWeapons.burr_model(host,root);burr.scale=Vector3.ONE*.55;host.Scenery.batch_static(burr)
+		var burr:Node3D
+		if burr_template==null:
+			burr=host.ForestWeapons.burr_model(host,root)
+			burr.scale=Vector3.ONE*.55
+			host.Scenery.batch_static(burr)
+			burr_template=burr
+		else:
+			burr=burr_template.duplicate(0) as Node3D
+			root.add_child(burr)
 		root.visible=false;bullets.append({"burr":burr,"root":root,"seed":seed,"bramble":bramble,"cup":cup,"stem":stem,"trail":trail,"grenade":grenade,"fuse":fuse})
 
 func update(sim:RefCounted)->void:

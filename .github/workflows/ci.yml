@@ -9,6 +9,22 @@ on:
 permissions:
   contents: read
 jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ontola/splitscreen-club/.github/actions/setup-godot@main
+        with:
+          version: '4.5.2'
+          export-templates: web_nothreads_release.zip web_nothreads_debug.zip
+      - name: Export the browser game
+        shell: bash
+        run: python3 tools/export_web.py --godot "$GODOT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frog-fighter-web
+          path: build/web/
+          if-no-files-found: error
   game-and-integration:
     runs-on: windows-latest
     timeout-minutes: 15
